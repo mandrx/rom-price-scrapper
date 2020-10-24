@@ -26,6 +26,7 @@ AutoItSetOption ("MouseCoordMode", 2)
 #include <Date.au3>
 
 HotKeySet("^0",exitApp)
+HotKeySet("^1",checkEndList)
 HotKeySet("^5",scrollItemList)
 HotKeySet("^6",printPricelist)
 HotKeySet("^7",getItemInfo)
@@ -85,6 +86,7 @@ Global $lastItemID = 0
 Global $scanning = False
 Global $updateInterval = 0
 Global $pause = False
+Global $lastListEndChecksum = 0
 
 ; Main GUI
 $guiHeight = 500
@@ -166,7 +168,12 @@ func scrollItemList()
 	MouseWheel("down",1)
 	Sleep(150)
 	MouseWheel("down",1)
-	Sleep(150)
+	Sleep(1500)
+
+	if checkEndList() Then
+		print("= scrollItemList Ended!")
+		$scanning = False
+	EndIf
 
 	;MouseClickDrag("left",$listDragPointCoor[0],$listDragPointCoor[1],$listDragPointCoor[0],$listDragPointCoor[1]-$listDragDistance,$scrollDragSpeed)
 EndFunc
@@ -285,9 +292,26 @@ func getItemInfo()
 	;print("> getItemInfo end")
 EndFunc
 
+func checkEndList()
+	Dim $area[4] = [$listAreaStartCoor[0]+40,$listAreaStartCoor[1]+20,$listAreaStartCoor[0]+70,$listAreaStartCoor[1]+300]
+
+	Local $pixel_checksum = PixelChecksum($area[0],$area[1],$area[2],$area[3])
+
+
+	if $lastListEndChecksum == $pixel_checksum Then
+		;print("> List End")
+		return True
+	Else
+		;print("# "&$pixel_checksum)
+		$lastListEndChecksum = $pixel_checksum
+		return False
+	EndIf
+
+EndFunc
+
 func backToList()
 	MouseClick("left",$backButtonCoor[0],$backButtonCoor[1],1,$mouseMoveDelay)
-	EndFunc
+EndFunc
 
 Func exitApp()
 	$scanning = False
