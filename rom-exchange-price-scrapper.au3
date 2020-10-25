@@ -26,40 +26,58 @@ AutoItSetOption ("MouseCoordMode", 2)
 #include <Date.au3>
 
 HotKeySet("^0",exitApp)
-HotKeySet("^1",checkEndList)
+HotKeySet("^1",findCategory)
+HotKeySet("^2",changeCategory)
+HotKeySet("^4",pauseScan)
 HotKeySet("^5",scrollItemList)
 HotKeySet("^6",printPricelist)
 HotKeySet("^7",getItemInfo)
 HotKeySet("^8",scanCurrentList)
-HotKeySet("^9",pauseScan)
+HotKeySet("^9",reloadINI)
 
 Local $appName = "ROM Exchange Price Scrapper v0.1"
 
-Dim $listDragPointCoor[2] = [getConf("listDragPointCoor_x"),getConf("listDragPointCoor_y")]
-Local $listDragDistance = getConf("listDragDistance")
-Local $scrollDragSpeed = getConf("scrollDragSpeed")
-Local $mouseMoveDelay = getConf("mouseMoveDelay")
 
-Dim $backButtonCoor[2] = [getConf("backButtonCoor_x"),getConf("backButtonCoor_y")]
+reloadINI()
+Func reloadINI()
+	Global $listDragPointCoor[2] = [getConf("listDragPointCoor_x"),getConf("listDragPointCoor_y")]
+	Global $listDragDistance = getConf("listDragDistance")
+	Global $scrollDragSpeed = getConf("scrollDragSpeed")
+	Global $mouseMoveDelay = getConf("mouseMoveDelay")
 
-Dim $listAreaStartCoor[2] = [getConf("listAreaStartCoor_x"),getConf("listAreaStartCoor_y")]
-Dim $listAreaSize[2] = [getConf("listAreaStartCoor_x"),getConf("listAreaSize_y")]
+	Global $backButtonCoor[2] = [getConf("backButtonCoor_x"),getConf("backButtonCoor_y")]
 
+	Global $listAreaStartCoor[2] = [getConf("listAreaStartCoor_x"),getConf("listAreaStartCoor_y")]
 
-Local $selectedItemID_address = getConf("itemIdAddress")
-Local $selectedItemPrice_address = getConf("itemPriceAddress")
-
-Local $appClientMemoryName = getConf("emulatorMemoryProcess")
-Local $appClientWindowName = getConf("emulatorWindowProcess")
-
-Local $imageTolerence = getConf("imageTolerence")
+	Global $itemListWidth = getConf("itemListWidth")
+	Global $itemListHeight = getConf("itemListHeight")
 
 
-if getConf("debugMode") == 1 Then
-	Local $debugMode =  True
-Else
-	Local $debugMode =  False
-EndIf
+	Global $selectedItemID_address = getConf("itemIdAddress")
+	Global $selectedItemPrice_address = getConf("itemPriceAddress")
+
+	Global $appClientMemoryName = getConf("emulatorMemoryProcess")
+	Global $appClientWindowName = getConf("emulatorWindowProcess")
+
+	Global $itemListImageTolerence = getConf("itemListImageTolerence")
+	Global $categoryImageTolerence = getConf("categoryImageTolerence")
+
+
+
+	Global $categorylistAreaStartCoor[2] = [getConf("categorylistAreaStartCoor_x"),getConf("categorylistAreaStartCoor_y")]
+
+	Global $categoryListWidth = getConf("categoryListWidth")
+	Global $categoryListHeight = getConf("categoryListHeight")
+
+	Global $debugMode =  False
+	if getConf("debugMode") == 1 Then
+		$debugMode =  True
+	EndIf
+
+	print("> Ini reloaded!")
+EndFunc
+
+
 
 
 ; Init Process data
@@ -81,22 +99,26 @@ $winsize = WinGetClientSize($hWnd)
 
 
 
+
 Global $jsonObj = Json_ObjCreate()
 Global $lastItemID = 0
 Global $scanning = False
 Global $updateInterval = 0
 Global $pause = False
 Global $lastListEndChecksum = 0
+Global $categoryIndex = 0
+Global $subCategoryIndex = 0
+Dim $categoryList[9]  = ["item9","item8","item7","item6","item5","item4","item3","item2","item1"]
 
 ; Main GUI
-$guiHeight = 500
+$guiHeight = 140
 $guiWidth = 300
 $hGUI = GUICreate($appName, $guiWidth, $guiHeight, (@DesktopWidth - $guiWidth - 10), 10,BitXOR($WS_CAPTION, $WS_POPUP, $WS_SYSMENU))
 $itemPrice_grp = GUICtrlCreateGroup("Selected Item Price",10, 10,$guiWidth - 20, 120)
 $itemPrice_txt = GUICtrlCreateInput("0",20, 30,$guiWidth - 40, 40,BitXOR($ES_CENTER,$WS_DISABLED))
 GUICtrlSetFont ( -1, 24)
 $start_btn = GUICtrlCreateButton("Start Scan", 20, 80, 120, 32)
-$pricecount_txt = GUICtrlCreateLabel("", 150, 90, 150, 26)
+$pricecount_txt = GUICtrlCreateLabel("", 150, 90, 120, 26)
 GUICtrlCreateGroup("", -99, -99, 1, 1) ;close group
 GUISetState(@SW_SHOW)
 
@@ -137,6 +159,14 @@ Func startScan()
 
 	MouseClick("left",$listDragPointCoor[0],$listDragPointCoor[1]) ; Init click to focus
 
+	; Show list area
+	if $debugMode Then
+		MouseMove($listAreaStartCoor[0],$listAreaStartCoor[1])
+		Sleep(500)
+		MouseMove($listAreaStartCoor[0]+($itemListWidth*2),$listAreaStartCoor[1]+($itemListHeight*4+40))
+	EndIf
+
+
 	$scanning = True
 
 	While $scanning
@@ -159,8 +189,7 @@ EndFunc
 
 func scrollItemList()
 	WinActivate($hWnd)
-	;MouseMove($listAreaStartCoor[0],$listAreaStartCoor[1])
-	;Sleep(500)
+
 	MouseClick("left",$listDragPointCoor[0],$listDragPointCoor[1]-50)
 	Sleep(150)
 	MouseWheel("down",1)
@@ -171,7 +200,10 @@ func scrollItemList()
 	Sleep(1500)
 
 	if checkEndList() Then
-		print("= scrollItemList Ended!")
+
+		printPricelist()
+		print("> scrollItemList Ended!")
+
 		$scanning = False
 	EndIf
 
@@ -200,17 +232,17 @@ func scanEachListItem($index)
 	$column = Mod($index,2);
 	$row = Floor($index / 2)
 
-	$offset_x = $column * 360
-	$offset_y = $row * 100
+	$offset_x = $column * $itemListWidth;370
+	$offset_y = $row * $itemListHeight;96
 
 	$list_point_x = $listAreaStartCoor[0]+$offset_x
 	$list_point_y = $listAreaStartCoor[1]+$offset_y
 
-	$area[0] = $list_point_x
+	$area[0] = $list_point_x+($itemListWidth-110)
 	$area[1] = $list_point_y
 
-	$area[2] = $list_point_x+380
-	$area[3] = $list_point_y+120
+	$area[2] = $list_point_x+($itemListWidth+10)
+	$area[3] = $list_point_y+($itemListHeight+24)
 
 	if $debugMode Then
 		MouseMove($area[0],$area[1])
@@ -226,16 +258,17 @@ EndFunc
 func scanClickPoint($rect)
 	dim $result[2]
 
-	$found = _ImageSearchArea("res/border_tr.bmp",0 , $rect[0],$rect[1],$rect[2],$rect[3], $result[0], $result[1],$imageTolerence)
+	$found = _ImageSearchArea("res/border_tr.bmp",0 , $rect[0],$rect[1],$rect[2],$rect[3], $result[0], $result[1],$itemListImageTolerence)
 
 	if($found) Then
+		Dim $pos[2] =  [$result[0]-50,$result[1]+5]
 
 		if $debugMode Then
 			print('- ' &  $result[0] & " / " & $result[1]);
-			MouseMove($result[0]-50,$result[1]+5)
+			MouseMove($pos[0],$pos[1])
 			Sleep(200)
 		Else
-			MouseClick("left",$result[0]-50,$result[1]+5,1,$mouseMoveDelay)
+			MouseClick("left",$pos[0],$pos[1],1,$mouseMoveDelay)
 			getItemInfo()
 		EndIf
 
@@ -309,6 +342,42 @@ func checkEndList()
 
 EndFunc
 
+func findCategory()
+	print($categoryList[$categoryIndex])
+	Dim $result[2]
+	Dim $rect[4] = [$categorylistAreaStartCoor[0],$categorylistAreaStartCoor[1],$categorylistAreaStartCoor[0] + $categoryListWidth,$categorylistAreaStartCoor[1] + $categoryListHeight]
+	Local $imageFile = "res/" & $categoryList[$categoryIndex] & ".bmp"
+	Local $found = _ImageSearchArea($imageFile,1 , $rect[0],$rect[1],$rect[2],$rect[3], $result[0], $result[1],$categoryImageTolerence)
+
+	if $debugMode Then
+		MouseMove($rect[0],$rect[1])
+		Sleep(500)
+		MouseMove($rect[2],$rect[3],0)
+	EndIf
+
+	if($found) Then
+		Dim $pos[2] =  [$result[0],$result[1]]
+		print($result[0] & "/" & $result[1])
+		if $debugMode Then
+			MouseMove($pos[0],$pos[1])
+		Else
+			MouseMove($pos[0],$pos[1])
+			;MouseClick("left",$pos[0],$pos[1])
+		EndIf
+	Else
+		print("! Category not found! - " & $imageFile)
+	EndIf
+
+
+EndFunc
+
+func changeCategory()
+	$categoryIndex+=1
+	if $categoryIndex >= UBound($categoryList) Then
+		$categoryIndex = 0
+	EndIf
+EndFunc
+
 func backToList()
 	MouseClick("left",$backButtonCoor[0],$backButtonCoor[1],1,$mouseMoveDelay)
 EndFunc
@@ -330,6 +399,9 @@ func addToPricelist($itemID,$itemPrice)
 	$value = ($valueArr)
 	Json_ObjPut($jsonObj,$itemID,$value)
 	$priceCount = Json_ObjGetCount($jsonObj)
+
+	$updateInterval = 31
+	updateGuiView()
 	GUICtrlSetData($pricecount_txt,"Price Recorded: " & $priceCount)
 EndFunc
 
