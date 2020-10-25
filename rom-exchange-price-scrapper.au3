@@ -13,7 +13,7 @@ AutoItSetOption ("MouseClickDownDelay",80);
 AutoItSetOption ("MouseClickDragDelay",100)
 AutoItSetOption ("MouseCoordMode", 2)
 
-#RequireAdmin
+;#RequireAdmin
 #include <Array.au3>
 #include <GUIConstants.au3>
 #include <GUIConstantsEx.au3>
@@ -69,6 +69,18 @@ Func reloadINI()
 	Global $categoryListWidth = getConf("categoryListWidth")
 	Global $categoryListHeight = getConf("categoryListHeight")
 
+	Global $itemScan1_Name = getConf("itemScan1_Name")
+	Global $itemScan2_Name = getConf("itemScan2_Name")
+	Global $itemScan3_Name = getConf("itemScan3_Name")
+
+	Global $itemScan1_Id = getConf("itemScan1_Id")
+	Global $itemScan2_Id = getConf("itemScan2_Id")
+	Global $itemScan3_Id = getConf("itemScan3_Id")
+
+	Global $itemScan1_Price = getConf("itemScan1_Price")
+	Global $itemScan2_Price = getConf("itemScan2_Price")
+	Global $itemScan3_Price = getConf("itemScan3_Price")
+
 	Global $debugMode =  False
 	if getConf("debugMode") == 1 Then
 		$debugMode =  True
@@ -111,7 +123,7 @@ Global $subCategoryIndex = 0
 Dim $categoryList[9]  = ["item9","item8","item7","item6","item5","item4","item3","item2","item1"]
 
 ; Main GUI
-$guiHeight = 140
+$guiHeight = 440
 $guiWidth = 300
 $hGUI = GUICreate($appName, $guiWidth, $guiHeight, (@DesktopWidth - $guiWidth - 10), 10,BitXOR($WS_CAPTION, $WS_POPUP, $WS_SYSMENU))
 $itemPrice_grp = GUICtrlCreateGroup("Selected Item Price",10, 10,$guiWidth - 20, 120)
@@ -120,8 +132,57 @@ GUICtrlSetFont ( -1, 24)
 $start_btn = GUICtrlCreateButton("Start Scan", 20, 80, 120, 32)
 $pricecount_txt = GUICtrlCreateLabel("", 150, 90, 120, 26)
 GUICtrlCreateGroup("", -99, -99, 1, 1) ;close group
+
+$hTab = GUICtrlCreateTab(10, 140, 280, 280)
+local $i = 1
+GUICtrlCreateTabItem("Memory Address")
+
+
+$updateAddress1_grp = GUICtrlCreateGroup("Address Update Wizard",20, 170,$guiWidth - 20, 120)
+Global $step0[2],$step1[4],$step2[4],$step3[4]
+
+$step0[0] = GUICtrlCreateLabel("If the shown price is incorrect, press 'Update Address' and follow the instructions to update the memory address.", 30, 200, 240, 100)
+GUICtrlSetFont ( -1, 12)
+GUICtrlSetColor(-1,0xff5e00)
+$step0[1] = GUICtrlCreateButton("Update Address", 45, 300, 200, 40)
+GUICtrlSetFont ( -1, 12)
+
+
+$step1[0] = GUICtrlCreateLabel("1. Open Exchange, go to '"&$itemScan1_Name&"' listing to see the price, and press 'Next Step'...", 30, 170, 240, 100)
+GUICtrlSetFont ( -1, 11)
+GUICtrlSetColor(-1,0x0659d6)
+$step1[2] = GUICtrlCreatePic("res/step1.jpg",30,220,242,132)
+$step1[1] = GUICtrlCreateButton("Next Step >", 31, 360, 170, 36)
+$step1[3] = GUICtrlCreateButton("Cancel", 210, 360, 60, 36)
+
+
+$step2[0] = GUICtrlCreateLabel("2. Go to '"&$itemScan2_Name&"' listing, and press 'Next Step'...", 30, 175, 240, 100)
+GUICtrlSetFont ( -1, 11)
+GUICtrlSetColor(-1,0x0659d6)
+$step2[2] = GUICtrlCreatePic("res/step2.jpg",30,220,242,132)
+$step2[1] = GUICtrlCreateButton("Next Step >", 31, 360, 170, 36)
+$step2[3] = GUICtrlCreateButton("Cancel", 210, 360, 60, 36)
+
+$step3[0] = GUICtrlCreateLabel("3. Next, go to '"&$itemScan3_Name&"' listing, and press 'Next Step'...", 30, 175, 240, 100)
+GUICtrlSetFont ( -1, 11)
+GUICtrlSetColor(-1,0x0659d6)
+$step3[2] = GUICtrlCreatePic("res/step3.jpg",30,220,242,132)
+$step3[1] = GUICtrlCreateButton("Next Step >", 31, 360, 170, 36)
+$step3[3] = GUICtrlCreateButton("Cancel", 210, 360, 60, 36)
+GUICtrlSetFont ( -1, 12)
+
+
+GUICtrlSetState($updateAddress1_grp , $GUI_HIDE)
+
+$i = 2
+GUICtrlCreateTabItem("Hotkeys")
+
+GUICtrlCreateLabel("See how 'laggy' the UDF buttons are when selecting this tab because of using WinSetState", 20, 200, 150, 60)
+GUICtrlCreateButton("Built-In " & $i, 20 + ($i * 100), 40 + ($i * 50), 80, 30)
+
 GUISetState(@SW_SHOW)
 
+showStep0()
 
 While 1
 	Switch GUIGetMsg()
@@ -130,11 +191,108 @@ While 1
 		Case $start_btn
 			startScan()
 
+		Case $step0[1]
+			doStep1()
+
+		Case $step1[1]
+			doStep2()
+
+		Case $step2[1]
+			doStep3()
+
+		Case $step3[1]
+			doStepFinal()
+
+		Case $step1[3],$step2[3],$step3[3]
+			doCancelUpdate()
+
 	EndSwitch
 
 	updateGuiView()
 	Sleep(10)
 WEnd
+
+
+;==============================
+;	GUI RELATED FUNCTIONS
+;==============================
+
+func hideAllUpdateSteps()
+
+	For $i = 0 To UBound($step0)-1
+		GUICtrlSetState ( $step0[$i], $GUI_HIDE )
+	Next
+
+	For $i = 0 To UBound($step1)-1
+		GUICtrlSetState ( $step1[$i], $GUI_HIDE )
+	Next
+
+	For $i = 0 To UBound($step2)-1
+		GUICtrlSetState ( $step2[$i], $GUI_HIDE )
+	Next
+
+	For $i = 0 To UBound($step3)-1
+		GUICtrlSetState ( $step3[$i], $GUI_HIDE )
+	Next
+
+EndFunc
+
+
+func showStep0()
+	hideAllUpdateSteps()
+
+	For $i = 0 To UBound($step0)-1
+		GUICtrlSetState ( $step0[$i], $GUI_SHOW )
+	Next
+EndFunc
+
+func doStep1()
+	hideAllUpdateSteps()
+
+	For $i = 0 To UBound($step1)-1
+		GUICtrlSetState ( $step1[$i], $GUI_SHOW )
+	Next
+
+
+EndFunc
+
+func doStep2()
+	hideAllUpdateSteps()
+
+	For $i = 0 To UBound($step2)-1
+		GUICtrlSetState ( $step2[$i], $GUI_SHOW )
+	Next
+
+
+	Local $scan_result = _MemoryScan($hMemory,"A8 61 00 00")
+
+
+	print($scan_result)
+
+EndFunc
+
+func doStep3()
+	hideAllUpdateSteps()
+
+	For $i = 0 To UBound($step3)-1
+		GUICtrlSetState ( $step3[$i], $GUI_SHOW )
+	Next
+EndFunc
+
+func doStepFinal()
+	hideAllUpdateSteps()
+
+	;For $i = 0 To UBound($step1)-1
+		;GUICtrlSetState ( $step1[$i], $GUI_SHOW )
+	;Next
+
+	print("DONE ALL STEPS")
+EndFunc
+
+func doCancelUpdate()
+	showStep0()
+	print("> Memory Address Update Wizard Cancelled...")
+EndFunc
 
 func updateGuiView()
 
@@ -151,6 +309,12 @@ func updateGuiView()
 	$updateInterval += 1
 
 EndFunc
+
+
+
+;===========================================
+;	PRICE SCANNING RELATED FUNCTIONS
+;===========================================
 
 Func startScan()
 	WinActivate($hWnd)
@@ -284,6 +448,7 @@ EndFunc
 ;$sFilePath = @ScriptDir & "\[output] eq with price.json"
 ;Local $hFileOpen = FileOpen($sFilePath, bitxor(2,8))
 ;FileWrite($hFileOpen,$outputJson)
+
 
 func print($string)
 	ConsoleWrite(@CRLF & $string)
@@ -421,8 +586,6 @@ Func formatPrice($number)
 	return StringRegExpReplace($number, "(?!\.)(\d)(?=(?:\d{3})+(?!\d))(?<!\.\d{1}|\.\d{2}|\.\d{3}|\.\d{4}|\.\d{5}|\.\d{6}|\.\d{7}|\.\d{8}|\.\d{9})", "\1,")
 EndFunc
 
-
-;Function for getting HWND from PID
 Func _GetHwndFromPID($PID)
 	$hWnd = 0
 	$winlist = WinList()
@@ -438,4 +601,112 @@ Func _GetHwndFromPID($PID)
 		Next
 	Until $hWnd <> 0
 	Return $hWnd
-EndFunc;==>_GetHwndFromPID
+EndFunc
+
+
+
+
+
+
+
+
+Func roundBytes($address,$bytesLen)
+	return (Floor($address/$bytesLen))*$bytesLen
+EndFunc
+
+Func roundDword($address)
+	return roundBytes($address,4)
+EndFunc
+
+Func roundWord($address)
+	return roundBytes($address,2)
+EndFunc
+
+Func _MemoryScan($ProcessHandle, $Pattern, $StartAddress = 0x6FFFFFFF, $StopAddress = 0xFFFFFFFF, $Step = 2560000)
+
+	$StartAddress = 0xAF000000
+	$StopAddress = 0xDFFFFFFF;0x88FFF130
+
+	$StartAddress = roundDword(Int(StringFormat("%u", $StartAddress)))
+	$StopAddress = roundDword(Int(StringFormat("%u", $StopAddress)))
+	$Step = roundDword($Step)
+
+	$Pattern = "A8 61 00 00"
+
+	If Not IsArray($ProcessHandle) Then
+	  SetError(1)
+	  Return -1
+	EndIf
+
+	$Pattern = StringRegExpReplace($Pattern, '[^?0123456789ABCDEFabcdef.]', '')
+
+	If StringLen($Pattern) = 0 Then
+	  SetError(2)
+	  Return -2
+	EndIf
+
+	Local $BufferPattern, $FormatedPattern
+	For $i = 0 To ((StringLen($Pattern) / 2) - 1)
+	  $BufferPattern = StringLeft($Pattern, 2)
+	  $Pattern = StringRight($Pattern, StringLen($Pattern) - 2)
+	  $FormatedPattern = $FormatedPattern & $BufferPattern
+	Next
+
+	$Pattern = $FormatedPattern
+
+	Local $countScan = 0
+	Local $ScanStep = $Step - (StringLen($Pattern) / 2)
+	$ScanStep = $Step
+
+
+
+	For $Address = $StartAddress To $StopAddress Step $ScanStep
+		Local $mChunk = _MemoryRead($Address, $ProcessHandle, 'byte['&$Step&']')
+
+		findInChunk($mChunk,$Pattern,$Address)
+
+		$countScan += 1
+	Next
+
+	Return -3
+EndFunc
+
+#cs
+Func findInChunk($memory,$pattern,$address)
+
+		Global $mStrBuffer = StringTrimLeft(String($memory),2) ; remove 0x
+		Global $bytes = 4
+
+		Local $scanCount = 0
+		Local $foundCount = 0
+
+		While (StringLen($mStrBuffer) > 0)
+			Local $bytesStringLen = $bytes * 2
+			$checkString = StringLeft($mStrBuffer,$bytesStringLen)
+
+			Local $pos
+			if($checkString == $pattern) Then
+				$pos = $scanCount * $bytes
+				print("+ Found 0x" & hex($pos,8) & " + 0x" & Hex($address,8) & " = 0x" & Hex(($pos+$address),8))
+				$foundCount += 1
+
+			EndIf
+			$mStrBuffer = StringTrimLeft($mStrBuffer,$bytesStringLen)
+
+			if( Mod($scanCount,10000) == 0 ) Then
+				print("+ Found " & $foundCount & " - " & $pos & " + 0x" & Hex($address,8))
+			EndIf
+
+
+			$scanCount += 1
+		WEnd
+
+
+EndFunc
+#ce
+
+Func findInChunk($memory,$pattern,$address)
+	Local $mStrBuffer = StringTrimLeft(String($memory),2) ; remove 0x
+	Local $pos = Floor((StringInStr($mStrBuffer,$pattern,0))/2)
+	print("+ Found 0x" & hex($pos,8) & " = " & $pos & " + 0x" & Hex($address,8) & " = 0x" & Hex(($pos+$address),8))
+EndFunc
