@@ -13,10 +13,10 @@ AutoItSetOption ("MouseClickDownDelay",80);
 AutoItSetOption ("MouseClickDragDelay",100)
 AutoItSetOption ("MouseCoordMode", 2)
 
+
 #RequireAdmin
 #include <Array.au3>
-#include <SQLite.au3>
-#include <SQLite.dll.au3>
+#include <File.au3>
 
 #include <GUIConstants.au3>
 #include <GUIConstantsEx.au3>
@@ -31,7 +31,7 @@ AutoItSetOption ("MouseCoordMode", 2)
 HotKeySet("^0",exitApp)
 HotKeySet("^1",findCategory)
 HotKeySet("^2",changeCategory)
-HotKeySet("^4",pauseScan)
+HotKeySet("^4",stopAddressScanning)
 HotKeySet("^5",scrollItemList)
 HotKeySet("^6",printPricelist)
 HotKeySet("^7",getItemInfo)
@@ -39,7 +39,6 @@ HotKeySet("^8",scanCurrentList)
 HotKeySet("^9",reloadINI)
 
 Local $appName = "ROM Exchange Price Scrapper v0.1"
-
 
 reloadINI()
 Func reloadINI()
@@ -81,13 +80,13 @@ Func reloadINI()
 	Global $itemScan2_Name = getConf("itemScan2_Name")
 	Global $itemScan3_Name = getConf("itemScan3_Name")
 
-	Global $itemScan1_Id = getConf("itemScan1_Id")
-	Global $itemScan2_Id = getConf("itemScan2_Id")
-	Global $itemScan3_Id = getConf("itemScan3_Id")
+	Global $itemScan1_Id = Int(getConf("itemScan1_Id"))
+	Global $itemScan2_Id = Int(getConf("itemScan2_Id"))
+	Global $itemScan3_Id = Int(getConf("itemScan3_Id"))
 
-	Global $itemScan1_Price = getConf("itemScan1_Price")
-	Global $itemScan2_Price = getConf("itemScan2_Price")
-	Global $itemScan3_Price = getConf("itemScan3_Price")
+	Global $itemScan1_Price = Int(getConf("itemScan1_Price"))
+	Global $itemScan2_Price = Int(getConf("itemScan2_Price"))
+	Global $itemScan3_Price = Int(getConf("itemScan3_Price"))
 
 	Global $debugMode =  False
 	if getConf("debugMode") == 1 Then
@@ -119,11 +118,13 @@ $winsize = WinGetClientSize($hWnd)
 
 
 
-Global $tmpdirPath = ".tmpdir"
-;Global $tmpFileRes = ".tmpdir/scanresult.tmp"
+Global $tmpdirPath = "_tmpdir"
 Global $jsonObj = Json_ObjCreate()
+Global $addressScanning = False
 Global $lastItemID = 0
 Global $scanning = False
+Global $scanPriceAddressList[0]
+Global $scanIdAddressList[0]
 Global $updateInterval = 0
 Global $pause = False
 Global $lastListEndChecksum = 0
@@ -160,8 +161,9 @@ $step1[0] = GUICtrlCreateLabel("1. Open Exchange, go to '"&$itemScan1_Name&"' li
 GUICtrlSetFont ( -1, 11)
 GUICtrlSetColor(-1,0x0659d6)
 $step1[2] = GUICtrlCreatePic("res/step1.jpg",30,220,242,132)
-$step1[1] = GUICtrlCreateButton("Next Step >", 31, 360, 170, 36)
-$step1[3] = GUICtrlCreateButton("Cancel", 210, 360, 60, 36)
+Local $step1_btnlabel = "Start Scanning >"
+$step1[1] = GUICtrlCreateButton($step1_btnlabel, 31, 360, 150, 36)
+$step1[3] = GUICtrlCreateButton("Cancel", 190, 360, 80, 36)
 $step1[4] = GUICtrlCreateProgress ( 31, 400, 240, 20)
 GUICtrlSetState ( -1, $GUI_HIDE )
 
@@ -171,35 +173,47 @@ $step2[0] = GUICtrlCreateLabel("2. Go to '"&$itemScan2_Name&"' listing, and pres
 GUICtrlSetFont ( -1, 11)
 GUICtrlSetColor(-1,0x0659d6)
 $step2[2] = GUICtrlCreatePic("res/step2.jpg",30,220,242,132)
-$step2[1] = GUICtrlCreateButton("Next Step >", 31, 360, 170, 36)
-$step2[3] = GUICtrlCreateButton("Cancel", 210, 360, 60, 36)
+
+$step2[1] = GUICtrlCreateButton("Next Step >", 31, 360, 150, 36)
+$step2[3] = GUICtrlCreateButton("Cancel", 190, 360, 80, 36)
 $step2[4] = GUICtrlCreateProgress ( 31, 400, 240, 20)
 GUICtrlSetState ( -1, $GUI_HIDE )
 
 $step3[0] = GUICtrlCreateLabel("3. Next, go to '"&$itemScan3_Name&"' listing, and press 'Next Step'...", 30, 175, 240, 100)
 GUICtrlSetFont ( -1, 11)
 GUICtrlSetColor(-1,0x0659d6)
+
 $step3[2] = GUICtrlCreatePic("res/step3.jpg",30,220,242,132)
-$step3[1] = GUICtrlCreateButton("Next Step >", 31, 360, 170, 36)
-$step3[3] = GUICtrlCreateButton("Cancel", 210, 360, 60, 36)
-GUICtrlSetFont ( -1, 12)
+$step3[1] = GUICtrlCreateButton("Next Step >", 31, 360, 150, 36)
+$step3[3] = GUICtrlCreateButton("Cancel", 190, 360, 80, 36)
 $step3[4] = GUICtrlCreateProgress ( 31, 400, 240, 20)
 GUICtrlSetState ( -1, $GUI_HIDE )
 
 $i = 2
 GUICtrlCreateTabItem("Hotkeys")
+GUICtrlCreateLabel("Stop Address Scanning" & @CRLF & "Force Close", 40, 180, 140, 240)
+GUICtrlSetColor(-1,0x0c39e0)
+;GUICtrlSetBkColor(-1,0xDDDDDD)
 
-GUICtrlCreateLabel("See how 'laggy' the UDF buttons are when selecting this tab because of using WinSetState", 20, 200, 150, 60)
-GUICtrlCreateButton("Built-In " & $i, 20 + ($i * 100), 40 + ($i * 50), 80, 30)
+GUICtrlCreateLabel("CTRL + 4" & @CRLF & "CTRL + 0", 200, 180, 80, 240,$ES_CENTER)
+GUICtrlSetColor(-1,0x0c7711)
+;GUICtrlSetBkColor(-1,0xDDDDDD)
+
 
 GUISetState(@SW_SHOW)
 
 showStep0()
 
 While 1
+	getGuiMsg()
+	updateGuiView()
+	Sleep(10)
+WEnd
+
+func getGuiMsg()
 	Switch GUIGetMsg()
 		Case $GUI_EVENT_CLOSE, $idOK
-			ExitLoop
+			exitApp()
 		Case $start_btn
 			startScan()
 
@@ -219,10 +233,7 @@ While 1
 			doCancelUpdate()
 
 	EndSwitch
-
-	updateGuiView()
-	Sleep(10)
-WEnd
+EndFunc
 
 
 ;==============================
@@ -252,6 +263,7 @@ EndFunc
 
 func showStep0()
 	hideAllUpdateSteps()
+	stopAddressScanning()
 
 	For $i = 0 To UBound($step0)-1
 		GUICtrlSetState ( $step0[$i], $GUI_SHOW )
@@ -271,27 +283,59 @@ EndFunc
 
 func doStep2()
 
-	$deleteCmd = @ComSpec & " /c del /Q " & $tmpdirPath
-	RunWait($deleteCmd,@WorkingDir,@SW_HIDE)
+	if Not(FileExists($tmpdirPath)) Then
+		DirCreate($tmpdirPath)
+		FileSetAttrib($tmpdirPath,"+H")
+	EndIf
+
+	clearScanCache()
 
 	GUICtrlSetState ( $step1[1], $GUI_DISABLE )
-	GUICtrlSetData( $step1[1], "Scanning...(slow)" )
-	GUICtrlSetState ( $step1[4], $GUI_SHOW )
+	GUICtrlSetData( $step1[1], "CTRL+4 to stop..." )
+	GUICtrlSetState( $step1[4], $GUI_SHOW )
+	GUICtrlSetData( $step1[4], 0)
 
-	Local $scan_result = _MemoryScan($hMemory,"48 E8 01 00",$scanStartAddress,$scanStopAddress,$scanCacheSize)
+	Local $scan_result = _MemoryScan($hMemory,$itemScan1_Price,$scanStartAddress,$scanStopAddress,$scanCacheSize)
 
-	print($scan_result)
+	GUICtrlSetState ( $step1[1], $GUI_ENABLE )
+	GUICtrlSetData( $step1[1], $step1_btnlabel )
 
-	hideAllUpdateSteps()
 
-	For $i = 0 To UBound($step2)-1
-		GUICtrlSetState ( $step2[$i], $GUI_SHOW )
-	Next
-	GUICtrlSetState ( $step2[4], $GUI_HIDE )
+	if $scan_result == -3 Then
+		scanResToArray()
+
+		hideAllUpdateSteps()
+
+		For $i = 0 To UBound($step2)-1
+			GUICtrlSetState ( $step2[$i], $GUI_SHOW )
+		Next
+		GUICtrlSetState ( $step2[4], $GUI_HIDE )
+
+		stopAddressScanning()
+
+	Else
+		showStep0()
+	EndIf
+
 
 EndFunc
 
 func doStep3()
+
+	GUICtrlSetState ( $step2[1], $GUI_DISABLE )
+
+	if(MsgBox(BitXOR(1,64,262144),"Reminder","Please confirm that you are in '"&$itemScan2_Name&"' listing page and its current price is '" & $itemScan2_Price & "z'.")) Then
+	Else
+		return
+	EndIf
+	GUICtrlSetState ( $step2[1], $GUI_ENABLE )
+
+	; Compare item price with previous value, if it changes to current price, that's the address that we are looking for!
+	comparePreviousValue($itemScan2_Price)
+
+	; Start listing potential itemID
+	findPotentialItemID()
+
 	hideAllUpdateSteps()
 
 	For $i = 0 To UBound($step3)-1
@@ -302,18 +346,153 @@ func doStep3()
 EndFunc
 
 func doStepFinal()
-	hideAllUpdateSteps()
 
-	;For $i = 0 To UBound($step1)-1
-		;GUICtrlSetState ( $step1[$i], $GUI_SHOW )
-	;Next
+	GUICtrlSetState ( $step3[1], $GUI_DISABLE )
 
-	print("DONE ALL STEPS")
+	if(MsgBox(BitXOR(1,64,262144),"Reminder","Please confirm that you are in '"&$itemScan3_Name&"' listing page and its current price is '" & $itemScan3_Price & "z'.")) Then
+	Else
+		return
+	EndIf
+	GUICtrlSetState ( $step3[1], $GUI_ENABLE )
+
+	; Check item price address once more, just to be sure...
+	comparePreviousValue($itemScan3_Price)
+
+	; Filter itemid address list
+	filterPotentialItemID()
+
+	if (UBound($scanPriceAddressList) > 0) And UBound($scanIdAddressList) > 0 Then
+		MsgBox(BitXOR(64,262144),"Success!","Needed address has been saved.")
+
+		$selectedItemID_address = "0x" & Hex($scanIdAddressList[0],8)
+		$selectedItemPrice_address = "0x" & Hex($scanPriceAddressList[0],8)
+
+		setConf("itemIdAddress",$selectedItemID_address)
+		setConf("itemPriceAddress",$selectedItemPrice_address)
+
+		;$selectedItemID_address = getConf("itemIdAddress")
+		;$selectedItemPrice_address = getConf("itemPriceAddress")
+	Else
+		MsgBox(BitXOR(16,262144),"Fail!","Address cannot be found. Make sure your Root access for your emulator is enabled. Restart game & this tool also helps.")
+	EndIf
+
+	showStep0()
+
 EndFunc
 
+
 func doCancelUpdate()
-	showStep0()
 	print("> Memory Address Update Wizard Cancelled...")
+
+	stopAddressScanning()
+	showStep0()
+EndFunc
+
+
+func scanResToArray()
+
+Local $addCount = 0
+	$scanResList = _FileListToArray ( $tmpdirPath , "*.scanres",1)
+	if UBound($scanResList) <> 0 Then
+
+		For $i = 1 To $scanResList[0]
+			$fileName = $scanResList[$i];
+			$baseAddress = StringSplit($fileName,".")[1]
+			$addList = FileReadToArray($tmpdirPath & "\" & $fileName)
+			For $line = 0 To UBound($addList)-1
+				$addOffset = StringSplit($addList[$line],",")[1]
+
+				$endAdd = Dec($baseAddress) + Int($addOffset);
+
+				; Clean non-divided by 4 aligned address
+				$endAddress = Hex($endAdd,8)
+
+				if(alignedBy4($endAdd)) Then
+					addToPriceAddressList($endAdd)
+					print("+ " & $endAddress)
+				Else
+					print("- " & $endAddress)
+				EndIf
+
+				$addCount += 1
+			Next
+		Next
+
+	Else
+		MsgBox(BitXOR(16,262144),"Oops!","No address is found.")
+		; Reset wizard
+	EndIf
+
+EndFunc
+
+func comparePreviousValue($itemPrice)
+
+	$startingListCount = (UBound($scanPriceAddressList) - 1)
+
+
+	For $i = $startingListCount to 0 Step -1
+		$address = $scanPriceAddressList[$i]
+		$addressValue = _MemoryRead($address, $hMemory, 'dword')
+		print("> No. " & $i & ": Current value for " & Hex($address,8) & " = " & $addressValue)
+
+		if ($addressValue <> $itemPrice) Then
+			;print("- Price is not equal to " & $itemScan2_Price & "z. Wrong address.")
+			_ArrayDelete($scanPriceAddressList,$i)
+		Else
+			ConsoleWrite(" <<-- Gotcha!")
+		EndIf
+	Next
+
+EndFunc
+
+
+func findPotentialItemID()
+
+	; Find potential item id address based on item price address.
+	; item id normally 0x40 or 0x0A less or greater than item price address.
+
+	Global $scanIdAddressList[0]
+
+	$startingItemPriceListCount = (UBound($scanPriceAddressList) - 1)
+
+
+	For $i = $startingItemPriceListCount to 0 Step -1
+		print("> Checking potential for " & Hex($scanPriceAddressList[$i],8) )
+		For $i2 = 11 to -11 Step -1
+			$potentialAddress = ($scanPriceAddressList[$i] + (16 * $i2))
+			$potentialAddressValue = _MemoryRead($potentialAddress, $hMemory, 'dword')
+
+			if($potentialAddressValue == $itemScan2_Id) Then
+				print("+ Yes!! " & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
+				_ArrayAdd($scanIdAddressList,$potentialAddress)
+			Else
+				;print("- Nope! " & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
+			EndIf
+
+		Next
+	Next
+
+EndFunc
+
+func filterPotentialItemID()
+
+	$startingItemIdListCount = (UBound($scanIdAddressList) - 1)
+
+	For $i = $startingItemIdListCount to 0 Step -1
+		print("> Filtering potential for " & Hex($scanIdAddressList[$i],8) )
+
+		$potentialAddress = $scanIdAddressList[$i];
+		$potentialAddressValue = _MemoryRead($potentialAddress, $hMemory, 'dword')
+
+		if($potentialAddressValue == $itemScan3_Id) Then
+			ConsoleWrite(" <<--  OK!" & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
+		Else
+			ConsoleWrite(" <<-- Nope! " & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
+			_ArrayDelete($scanIdAddressList,$i)
+		EndIf
+
+	Next
+
 EndFunc
 
 func updateGuiView()
@@ -463,15 +642,6 @@ func scanClickPoint($rect)
 EndFunc
 
 
-
-; Save all prices data.
-;$outputJson = json_encode("")
-
-;$sFilePath = @ScriptDir & "\[output] eq with price.json"
-;Local $hFileOpen = FileOpen($sFilePath, bitxor(2,8))
-;FileWrite($hFileOpen,$outputJson)
-
-
 func print($string)
 	ConsoleWrite(@CRLF & $string)
 EndFunc
@@ -575,9 +745,11 @@ Func exitApp()
 EndFunc
 
 func getConf($key)
-	$iniValue = IniRead("config.ini","config",$key,"Error")
-	;print($iniValue)
-	return  $iniValue
+	return IniRead("config.ini","config",$key,"Error")
+EndFunc
+
+func setConf($key,$value)
+	IniWrite("config.ini","config",$key,$value)
 EndFunc
 
 
@@ -625,12 +797,24 @@ Func _GetHwndFromPID($PID)
 	Return $hWnd
 EndFunc
 
+func formatPattern($pattern)
+	$pArray = StringRegExp($pattern, ".{2}", 3)
+
+	if UBound($pArray) > 0 Then
+	_ArrayReverse($pArray)
+	$xx = '\x' & _ArrayToString($pArray,'\x')
+	EndIf
+
+EndFunc
 
 
-
-
-
-
+func alignedBy4($val)
+	if (Floor(($val/4))*4) == $val Then
+		return True
+	Else
+		return False
+	EndIf
+EndFunc
 
 Func roundBytes($address,$bytesLen)
 	return (Floor($address/$bytesLen))*$bytesLen
@@ -646,6 +830,8 @@ EndFunc
 
 Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddress = 0xEFFFFFFF, $Step = 2560000)
 
+	$addressScanning = True
+
 	$StartAddress = roundDword(Int(StringFormat("%u", $StartAddress)))
 	$StopAddress = roundDword(Int(StringFormat("%u", $StopAddress)))
 	$Step = roundDword($Step)
@@ -658,13 +844,23 @@ Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddr
 	  Return -1
 	EndIf
 
+
+
+	; Convert int to little endian hex
+	if IsInt($pattern) then
+		$pattern = Hex($pattern,8)
+		$pArray = StringRegExp($pattern, ".{2}", 3)
+		_ArrayReverse($pArray)
+		$pattern = _ArrayToString($pArray," ")
+	EndIf
+
 	$pattern = StringRegExpReplace($pattern, '[^?0123456789ABCDEFabcdef.]', '')
 
 	If StringLen($pattern) = 0 Then
 	  SetError(2)
 	  Return -2
 	EndIf
-	; grep -aPo -b '\xA8\x61' scan.0 ;
+
 	Local $BufferPattern, $FormatedPattern
 	For $i = 0 To ((StringLen($pattern) / 2) - 1)
 	  $BufferPattern = StringLeft($pattern, 2)
@@ -672,47 +868,31 @@ Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddr
 	  $FormatedPattern = $FormatedPattern & $BufferPattern
 	Next
 
-	$pattern = $FormatedPattern
+	; Split binary
+	$pArray = StringRegExp($FormatedPattern, ".{2}", 3)
+	$pattern = '\x' & _ArrayToString($pArray,'\x')
 
 	Local $countScan = 0
 	Local $ScanStep = $Step - (StringLen($pattern) / 2)
 	$ScanStep = $Step
 
-
-
-
-
-
-	Global $hQuery,$aNames,$aRow
-
-	_SQLite_Startup("library/sqlite3_302700200.dll")
-
-
-	_SQLite_Open() ; open :memory: Database
-	_SQLite_Exec(-1, "CREATE TABLE `scan_db` (memory,base_address);")
-
-
 	$Start_Time = TimerInit()
 	Local $lastWaitingTime = 0
 	For $address = $StartAddress To $StopAddress Step $ScanStep
 
+
 		$memory = _MemoryRead($address, $ProcessHandle, 'byte['&$Step&']')
 
 
-		;$Previous_Time = TimerInit()
-		;scanCacheFile($memory,$pattern,$address)
-		;scanCacheFile2($memory,$pattern,$address)
-		scanCacheFile3($memory,$pattern,$address)
-		;$Time_Difference = TimerDiff($Previous_Time)
-		;print("> Write time: " & $Time_Difference)
+		$Previous_Time = TimerInit()
+		scanMemSection($memory,$pattern,$address)
+		;scanMemSection2($memory,$pattern,$address)
+		;scanMemSection3($memory,$pattern,$address)
+		$Time_Difference = TimerDiff($Previous_Time)
+		print("> Write time: " & $Time_Difference)
 
 		;print($countScan)
 		$countScan += 1
-
-		if Mod($countScan,50) == 0 Then
-			print(">> Clean unneeded data.")
-			_SQLite_Exec(-1, "DELETE FROM `scan_db` Where  hex(memory) NOT LIKE '%"&$pattern&"%';")
-		EndIf
 
 		$waitingTime =  Ceiling(TimerDiff($Start_Time)/1000)
 
@@ -721,59 +901,46 @@ Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddr
 			print("> Waiting Time: " & $waitingTime & "s")
 		EndIf
 
+		if Not($addressScanning) Then
+			Return -4
+			ExitLoop
+		EndIf
 
+		getGuiMsg()
 		GUICtrlSetData($step1[4], (($countScan/$maxStep)*100))
-
 	Next
-
-
-	_SQLite_Exec(-1, "DELETE FROM `scan_db` Where  hex(memory) NOT LIKE '%"&$pattern&"%';")
-
-
-	;_SQLite_Query(-1, "SELECT ROWID,Count(*) FROM `scan_db` Where  hex(b) NOT LIKE '%"&$pattern&"%';", $hQuery)
-	_SQLite_Query(-1, "SELECT ROWID,Count(*) FROM `scan_db` ;", $hQuery)
-
-	_SQLite_FetchNames($hQuery, $aNames)
-	;ConsoleWrite(StringFormat(" %-10s  %-10s  %-10s  %-10s " & $aNames[0] &" - "& $aNames[1] &" - "& $aNames[2] &" - "& $aNames[3]) & @CRLF)
-	ConsoleWrite(StringFormat(" %-10s  %-10s  %-10s  %-10s " & $aNames[0] &" - "& $aNames[1] ) & @CRLF)
-
-	While _SQLite_FetchData($hQuery, $aRow, True, False) = $SQLITE_OK ; Read Out the next Row
-		print($aRow[0] & " - "& $aRow[1] & " - " )
-	WEnd
-
-	_SQLite_QueryFinalize($hQuery)
-	_SQLite_Exec(-1, "DROP TABLE `scan_db`;")
-	_SQLite_Close()
-	_SQLite_Shutdown()
-
-
 
 
 	Return -3
 EndFunc
 
-Func scanCacheFile($memory,$pattern,$address)
+Func stopAddressScanning()
+	clearScanCache()
+	$addressScanning = False
+EndFunc
 
-	$tmpFile = $tmpdirPath&"/"& hex($address,8)
-	$tmpFileRes = $tmpdirPath&"/scanres."& hex($address,8)
+func clearScanCache()
+	$deleteCmd = @ComSpec & " /c del /Q " & $tmpdirPath
+	RunWait($deleteCmd,@WorkingDir,@SW_HIDE)
+EndFunc
 
-	;$Previous_Time = TimerInit()
-	$payload = StringTrimLeft(String($memory),2);
+Func scanMemSection($memory,$pattern,$address)
+
+	$tmpFile = $tmpdirPath&"\"& hex($address,8)
+	$tmpFileRes = $tmpdirPath&"\"& hex($address,8)&".scanres"
+
+	$payload = $memory; StringTrimLeft(($memory),2);
 
 	FileWrite($tmpFile,$payload)
-	;$Time_Difference = TimerDiff($Previous_Time)
-	;print("> Write time: " & $Time_Difference)
 
 	; using grep is faster than autoit substring......  TODO: find faster way to scan
+	; Sqlite is faster than grep..
+
 	;$Previous_Time = TimerInit()
-	RunWait(@ComSpec & " /c grep -ob '" & $Pattern & "' " & $tmpFile & " >> " & $tmpFileRes,@WorkingDir,@SW_HIDE)
+	;RunWait(@ComSpec & " /c grep -ob '" & $Pattern & "' " & $tmpFile & " >> " & $tmpFileRes,@WorkingDir,@SW_HIDE)
 
-	;;;;RunWait(@ComSpec & " /c echo '"&StringTrimLeft(String($memory),2)&"' | grep " & $Pattern & "' " & $tmpFile & " >> " & $tmpFileRes,@WorkingDir,@SW_HIDE)
-	;;;;Run(@ComSpec & " /c echo '"&StringTrimLeft(String($memory),2)&"' | grep " & $Pattern & "' " & $tmpFile & " >> " & $tmpFileRes)
-
-	;$Time_Difference = TimerDiff($Previous_Time)
-	;print("> grep time: " & $Time_Difference)
-
+	$run_cmd = @ComSpec & ' /c "'&@WorkingDir&'\library\pcre2grep.exe" -a --file-offsets --buffer-size=3M  ' & $Pattern & " " & $tmpFile & " > " & $tmpFileRes
+	RunWait($run_cmd,@WorkingDir,@SW_HIDE)
 
 	FileDelete($tmpFile)
 
@@ -783,7 +950,8 @@ Func scanCacheFile($memory,$pattern,$address)
 
 EndFunc
 
-Func scanCacheFile2($memory,$pattern,$address)
+Func scanMemSection2($memory,$pattern,$address)
+	; Very slow
 	$payload = StringTrimLeft(String($memory),2);
 	$result = StringInStr($payload,$pattern)
 	if $result <> 0 Then
@@ -791,10 +959,11 @@ Func scanCacheFile2($memory,$pattern,$address)
 	EndIf
 EndFunc
 
+Func scanMemSection3($memory,$pattern,$address)
+	; No longer needed
+	;_SQLite_Exec(-1, "INSERT INTO scan_db(memory,base_address) VALUES (x'"&StringTrimLeft($memory,2)&"','"&hex($address,8)&"');")
+EndFunc
 
-
-
-
-Func scanCacheFile3($memory,$pattern,$address)
-	_SQLite_Exec(-1, "INSERT INTO scan_db(memory,base_address) VALUES (x'"&StringTrimLeft($memory,2)&"','"&hex($address,8)&"');")
+Func addToPriceAddressList($address)
+	_ArrayAdd($scanPriceAddressList,$address)
 EndFunc
