@@ -1,5 +1,5 @@
 # rom-price-scrapper
-Ragnarok Online Mobile: Eternal Love Exchange Price Scrapper for Romcodex
+Ragnarok Online M: Eternal Love Exchange Price Scrapper for [Romcodex](https://www.romcodex.com)
 
 Combining OCR and memory reading for price reading accuracy.
 
