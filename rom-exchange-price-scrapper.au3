@@ -8,13 +8,18 @@
 
 #ce ----------------------------------------------------------------------------
 
-AutoItSetOption ("MouseClickDelay",50);
-AutoItSetOption ("MouseClickDownDelay",80);
-AutoItSetOption ("MouseClickDragDelay",100)
-AutoItSetOption ("MouseCoordMode", 2)
-
-
 #RequireAdmin
+#RequireAdmin
+#Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_Icon=icon.ico
+#AutoIt3Wrapper_Outfile=Rom Price Scrapper-1.2.exe
+#EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
+
+AutoItSetOption("MouseClickDelay", 50) ;
+AutoItSetOption("MouseClickDownDelay", 80) ;
+AutoItSetOption("MouseClickDragDelay", 100)
+AutoItSetOption("MouseCoordMode", 2)
+
 #include <Array.au3>
 #include <File.au3>
 
@@ -30,28 +35,35 @@ AutoItSetOption ("MouseCoordMode", 2)
 
 #include <Date.au3>
 
-HotKeySet("^0",exitApp)
-HotKeySet("^1",findCategory)
-HotKeySet("^2",changeCategory)
-HotKeySet("^4",stopAddressScanning)
-HotKeySet("^5",scrollItemList)
-HotKeySet("^6",printPricelist)
-HotKeySet("^7",getItemInfo)
-HotKeySet("^8",scanCurrentList)
-HotKeySet("^9",reloadINI)
 
-Local $appName = "ROM Exchange Price Scrapper v0.1"
+HotKeySet("^0", exitApp)
+HotKeySet("^1", findCategory)
+HotKeySet("^2", changeCategory)
+HotKeySet("^4", stopAddressScanning)
+HotKeySet("^5", scrollItemList)
+HotKeySet("^6", savePricelist)
+HotKeySet("^7", getItemInfo)
+HotKeySet("^8", scanCurrentList)
+HotKeySet("^9", reloadINI)
 
+Local $appName = "ROM Exchange Price Scrapper v1.2"
+
+print("=================================================")
+print(">> START AT " & _Now())
+print("=================================================")
+
+; First load ini
 reloadINI()
+
 Func reloadINI()
-	Global $listDragPointCoor[2] = [getConf("listDragPointCoor_x"),getConf("listDragPointCoor_y")]
+	Global $listDragPointCoor[2] = [getConf("listDragPointCoor_x"), getConf("listDragPointCoor_y")]
 	Global $listDragDistance = getConf("listDragDistance")
 	Global $scrollDragSpeed = getConf("scrollDragSpeed")
 	Global $mouseMoveDelay = getConf("mouseMoveDelay")
 
-	Global $backButtonCoor[2] = [getConf("backButtonCoor_x"),getConf("backButtonCoor_y")]
+	Global $backButtonCoor[2] = [getConf("backButtonCoor_x"), getConf("backButtonCoor_y")]
 
-	Global $listAreaStartCoor[2] = [getConf("listAreaStartCoor_x"),getConf("listAreaStartCoor_y")]
+	Global $listAreaStartCoor[2] = [getConf("listAreaStartCoor_x"), getConf("listAreaStartCoor_y")]
 
 	Global $itemListWidth = getConf("itemListWidth")
 	Global $itemListHeight = getConf("itemListHeight")
@@ -72,7 +84,7 @@ Func reloadINI()
 	Global $categoryImageTolerence = getConf("categoryImageTolerence")
 	Global $itemListDuplicateImageTolerence = getConf("itemListDuplicateImageTolerence")
 
-	Global $categorylistAreaStartCoor[2] = [getConf("categorylistAreaStartCoor_x"),getConf("categorylistAreaStartCoor_y")]
+	Global $categorylistAreaStartCoor[2] = [getConf("categorylistAreaStartCoor_x"), getConf("categorylistAreaStartCoor_y")]
 
 	Global $categoryListWidth = getConf("categoryListWidth")
 	Global $categoryListHeight = getConf("categoryListHeight")
@@ -89,23 +101,23 @@ Func reloadINI()
 	Global $itemScan2_Price = Int(getConf("itemScan2_Price"))
 	Global $itemScan3_Price = Int(getConf("itemScan3_Price"))
 
-	Global $debugMode =  False
-	if getConf("debugMode") == 1 Then
-		$debugMode =  True
+	Global $outputPricelistJson = getConf("outputPricelistJson")
+
+	Global $debugMode = False
+	If getConf("debugMode") == 1 Then
+		$debugMode = True
 	EndIf
 
 	print("> Ini reloaded!")
-EndFunc
-
-
+EndFunc   ;==>reloadINI
 
 
 ; Init Process data
 Local $processList = ProcessList($appClientMemoryName)
-$latestPID = $processList[$processList[0][0]][1];
+$latestPID = $processList[$processList[0][0]][1] ;
 
-if Not(IsNumber($latestPID)) Then
-	MsgBox(16,"Error!",$appClientMemoryName & " cannot be found! Make sure you open your emulator before continue.")
+If Not (IsNumber($latestPID)) Then
+	MsgBox(16, "Error!", $appClientMemoryName & " cannot be found! Make sure you open your emulator before continue.")
 	Exit
 EndIf
 
@@ -113,16 +125,16 @@ Local $hMemory = _MemoryOpen($latestPID) ; Open the memory
 
 ; Init Window data
 Local $window_processList = ProcessList($appClientWindowName)
-$hWndPID = $window_processList[$window_processList[0][0]][1];
+$hWndPID = $window_processList[$window_processList[0][0]][1] ;
 
-if Not(IsNumber($hWndPID)) Then
-	MsgBox(16,"Error!",$appClientWindowName & " cannot be found! Make sure you open your emulator before continue.")
+If Not (IsNumber($hWndPID)) Then
+	MsgBox(16, "Error!", $appClientWindowName & " cannot be found! Make sure you open your emulator before continue.")
 	Exit
 EndIf
 
 Local $hWnd = _GetHwndFromPID($hWndPID)
 
-WinMove($hWnd,"",0,0,1280,720)
+WinMove($hWnd, "", 0, 0, 1280, 720)
 
 WinActivate($hWnd)
 Local $winpos = WinGetPos($hWnd)
@@ -132,7 +144,7 @@ $winsize = WinGetClientSize($hWnd)
 
 
 Global $tmpdirPath = "_tmpdir"
-Global $jsonObj = Json_ObjCreate()
+Global $pricelistJsonObj = Json_ObjCreate()
 Global $addressScanning = False
 Global $lastItemID = 0
 Global $scanning = False
@@ -145,79 +157,79 @@ Global $categoryIndex = 0
 Global $subCategoryIndex = 0
 Global $clickSpotChecksumList[0]
 Global $clickSpotCount = 0
-Dim $categoryList[9]  = ["item9","item8","item7","item6","item5","item4","item3","item2","item1"]
+Dim $categoryList[9] = ["item9", "item8", "item7", "item6", "item5", "item4", "item3", "item2", "item1"]
 
 ; Main GUI
 $guiHeight = 440
 $guiWidth = 300
-$hGUI = GUICreate($appName, $guiWidth, $guiHeight, (@DesktopWidth - $guiWidth - 10), 10,BitXOR($WS_CAPTION, $WS_POPUP, $WS_SYSMENU))
-$itemPrice_grp = GUICtrlCreateGroup("Selected Item Price",10, 10,$guiWidth - 20, 120)
-$itemPrice_txt = GUICtrlCreateInput("0",20, 30,$guiWidth - 40, 40,BitXOR($ES_CENTER,$WS_DISABLED))
-GUICtrlSetFont ( -1, 24)
+$hGUI = GUICreate($appName, $guiWidth, $guiHeight, (@DesktopWidth - $guiWidth - 10), 10, BitOR($WS_CAPTION, $WS_POPUP, $WS_SYSMENU))
+$itemPrice_grp = GUICtrlCreateGroup("Selected Item Price", 10, 10, $guiWidth - 20, 120)
+$itemPrice_txt = GUICtrlCreateInput("0", 20, 30, $guiWidth - 40, 40, BitOR($ES_CENTER, $WS_DISABLED))
+GUICtrlSetFont(-1, 24)
 $start_btn = GUICtrlCreateButton("Start Collecting", 20, 80, 140, 32)
 $pricecount_txt = GUICtrlCreateLabel("", 170, 90, 120, 26)
 GUICtrlCreateGroup("", -99, -99, 1, 1) ;close group
 
 $hTab = GUICtrlCreateTab(10, 140, 280, 290)
-local $i = 1
+Local $i = 1
 GUICtrlCreateTabItem("Memory Address")
 
 
-Global $step0[2],$step1[5],$step2[5],$step3[5]
+Global $step0[2], $step1[5], $step2[5], $step3[5]
 
 $step0[0] = GUICtrlCreateLabel("If the shown price is incorrect, press 'Update Address' and follow the instructions to update the memory address.", 30, 200, 240, 100)
-GUICtrlSetFont ( -1, 12)
-GUICtrlSetColor(-1,0xff5e00)
+GUICtrlSetFont(-1, 12)
+GUICtrlSetColor(-1, 0xff5e00)
 $step0[1] = GUICtrlCreateButton("Update Address", 45, 300, 200, 40)
-GUICtrlSetFont ( -1, 12)
+GUICtrlSetFont(-1, 12)
 
 Local $step1_btnlabel = "Start Scanning >"
-$step1[0] = GUICtrlCreateLabel("1. Open Exchange, go to '"&$itemScan1_Name&"' listing to see the price, and press '" & $step1_btnlabel & "'...", 30, 170, 240, 100)
-GUICtrlSetFont ( -1, 11)
-GUICtrlSetColor(-1,0x0659d6)
-$step1[2] = GUICtrlCreatePic("res/step1.jpg",30,220,242,132)
+$step1[0] = GUICtrlCreateLabel("1. Open Exchange, go to '" & $itemScan1_Name & "' listing to see the price, and press '" & $step1_btnlabel & "'...", 30, 170, 240, 100)
+GUICtrlSetFont(-1, 11)
+GUICtrlSetColor(-1, 0x0659d6)
+$step1[2] = GUICtrlCreatePic("res/step1.jpg", 30, 220, 242, 132)
 
 $step1[1] = GUICtrlCreateButton($step1_btnlabel, 31, 360, 150, 36)
 $step1[3] = GUICtrlCreateButton("Cancel", 190, 360, 80, 36)
-$step1[4] = GUICtrlCreateProgress ( 31, 400, 240, 20)
-GUICtrlSetState ( -1, $GUI_HIDE )
+$step1[4] = GUICtrlCreateProgress(31, 400, 240, 20)
+GUICtrlSetState(-1, $GUI_HIDE)
 
 
 
-$step2[0] = GUICtrlCreateLabel("2. Go to '"&$itemScan2_Name&"' listing, and press 'Next Step'...", 30, 175, 240, 100)
-GUICtrlSetFont ( -1, 11)
-GUICtrlSetColor(-1,0x0659d6)
-$step2[2] = GUICtrlCreatePic("res/step2.jpg",30,220,242,132)
+$step2[0] = GUICtrlCreateLabel("2. Go to '" & $itemScan2_Name & "' listing, and press 'Next Step'...", 30, 175, 240, 100)
+GUICtrlSetFont(-1, 11)
+GUICtrlSetColor(-1, 0x0659d6)
+$step2[2] = GUICtrlCreatePic("res/step2.jpg", 30, 220, 242, 132)
 
 $step2[1] = GUICtrlCreateButton("Next Step >", 31, 360, 150, 36)
 $step2[3] = GUICtrlCreateButton("Cancel", 190, 360, 80, 36)
-$step2[4] = GUICtrlCreateProgress ( 31, 400, 240, 20)
-GUICtrlSetState ( -1, $GUI_HIDE )
+$step2[4] = GUICtrlCreateProgress(31, 400, 240, 20)
+GUICtrlSetState(-1, $GUI_HIDE)
 
-$step3[0] = GUICtrlCreateLabel("3. Next, go to '"&$itemScan3_Name&"' listing, and press 'Next Step'...", 30, 175, 240, 100)
-GUICtrlSetFont ( -1, 11)
-GUICtrlSetColor(-1,0x0659d6)
+$step3[0] = GUICtrlCreateLabel("3. Next, go to '" & $itemScan3_Name & "' listing, and press 'Next Step'...", 30, 175, 240, 100)
+GUICtrlSetFont(-1, 11)
+GUICtrlSetColor(-1, 0x0659d6)
 
-$step3[2] = GUICtrlCreatePic("res/step3.jpg",30,220,242,132)
+$step3[2] = GUICtrlCreatePic("res/step3.jpg", 30, 220, 242, 132)
 $step3[1] = GUICtrlCreateButton("Next Step >", 31, 360, 150, 36)
 $step3[3] = GUICtrlCreateButton("Cancel", 190, 360, 80, 36)
-$step3[4] = GUICtrlCreateProgress ( 31, 400, 240, 20)
-GUICtrlSetState ( -1, $GUI_HIDE )
+$step3[4] = GUICtrlCreateProgress(31, 400, 240, 20)
+GUICtrlSetState(-1, $GUI_HIDE)
 
 $i = 2
 GUICtrlCreateTabItem("Hotkeys")
 GUICtrlCreateLabel("Stop Address Scanning" & _
-@CRLF & "Print Pricelise JSON" & _
-@CRLF & "Reload Config.ini" & _
-@CRLF & "Force Close" , 30, 180, 140, 240)
-GUICtrlSetColor(-1,0x0c39e0)
+		@CRLF & "Print Pricelise JSON" & _
+		@CRLF & "Reload Config.ini" & _
+		@CRLF & "Force Close", 30, 180, 140, 240)
+GUICtrlSetColor(-1, 0x0c39e0)
 ;GUICtrlSetBkColor(-1,0xDDDDDD)
 
 GUICtrlCreateLabel("CTRL + 4" & _
-@CRLF & "CTRL + 6" & _
-@CRLF & "CTRL + 9" & _
-@CRLF & "CTRL + 0", 200, 180, 80, 240,$ES_CENTER)
-GUICtrlSetColor(-1,0x0c7711)
+		@CRLF & "CTRL + 6" & _
+		@CRLF & "CTRL + 9" & _
+		@CRLF & "CTRL + 0", 200, 180, 80, 240, $ES_CENTER)
+GUICtrlSetColor(-1, 0x0c7711)
 ;GUICtrlSetBkColor(-1,0xDDDDDD)
 ;@CRLF & "CTRL + 0" & _
 ;@CRLF & "CTRL + 0" & _
@@ -225,6 +237,17 @@ GUICtrlSetColor(-1,0x0c7711)
 
 GUISetState(@SW_SHOW)
 
+
+;================
+; Starts here
+;================
+
+If Not (FileExists($tmpdirPath)) Then
+	DirCreate($tmpdirPath)
+	FileSetAttrib($tmpdirPath, "+H")
+EndIf
+
+clearScanCache()
 showStep0()
 
 While 1
@@ -233,7 +256,7 @@ While 1
 	Sleep(10)
 WEnd
 
-func getGuiMsg()
+Func getGuiMsg()
 	Switch GUIGetMsg()
 		Case $GUI_EVENT_CLOSE, $idOK
 			exitApp()
@@ -252,110 +275,105 @@ func getGuiMsg()
 		Case $step3[1]
 			doStepFinal()
 
-		Case $step1[3],$step2[3],$step3[3]
+		Case $step1[3], $step2[3], $step3[3]
 			doCancelUpdate()
 
 	EndSwitch
-EndFunc
+EndFunc   ;==>getGuiMsg
 
 
 ;==============================
 ;	GUI RELATED FUNCTIONS
 ;==============================
 
-func hideAllUpdateSteps()
+Func hideAllUpdateSteps()
 
-	For $i = 0 To UBound($step0)-1
-		GUICtrlSetState ( $step0[$i], $GUI_HIDE )
+	For $i = 0 To UBound($step0) - 1
+		GUICtrlSetState($step0[$i], $GUI_HIDE)
 	Next
 
-	For $i = 0 To UBound($step1)-1
-		GUICtrlSetState ( $step1[$i], $GUI_HIDE )
+	For $i = 0 To UBound($step1) - 1
+		GUICtrlSetState($step1[$i], $GUI_HIDE)
 	Next
 
-	For $i = 0 To UBound($step2)-1
-		GUICtrlSetState ( $step2[$i], $GUI_HIDE )
+	For $i = 0 To UBound($step2) - 1
+		GUICtrlSetState($step2[$i], $GUI_HIDE)
 	Next
 
-	For $i = 0 To UBound($step3)-1
-		GUICtrlSetState ( $step3[$i], $GUI_HIDE )
+	For $i = 0 To UBound($step3) - 1
+		GUICtrlSetState($step3[$i], $GUI_HIDE)
 	Next
 
-EndFunc
+EndFunc   ;==>hideAllUpdateSteps
 
 
-func showStep0()
+Func showStep0()
 	hideAllUpdateSteps()
 	stopAddressScanning()
 
-	For $i = 0 To UBound($step0)-1
-		GUICtrlSetState ( $step0[$i], $GUI_SHOW )
+	For $i = 0 To UBound($step0) - 1
+		GUICtrlSetState($step0[$i], $GUI_SHOW)
 	Next
-EndFunc
+EndFunc   ;==>showStep0
 
-func doStep1()
+Func doStep1()
 	hideAllUpdateSteps()
 
-	For $i = 0 To UBound($step1)-1
-		GUICtrlSetState ( $step1[$i], $GUI_SHOW )
+	For $i = 0 To UBound($step1) - 1
+		GUICtrlSetState($step1[$i], $GUI_SHOW)
 	Next
-	GUICtrlSetState ( $step1[4], $GUI_HIDE )
+	GUICtrlSetState($step1[4], $GUI_HIDE)
 
 
-EndFunc
+EndFunc   ;==>doStep1
 
-func doStep2()
-
-	if Not(FileExists($tmpdirPath)) Then
-		DirCreate($tmpdirPath)
-		FileSetAttrib($tmpdirPath,"+H")
-	EndIf
+Func doStep2()
 
 	clearScanCache()
 
-	GUICtrlSetState ( $step1[1], $GUI_DISABLE )
-	GUICtrlSetData( $step1[1], "CTRL+4 to stop..." )
-	GUICtrlSetState( $step1[4], $GUI_SHOW )
-	GUICtrlSetData( $step1[4], 0)
+	GUICtrlSetState($step1[1], $GUI_DISABLE)
+	GUICtrlSetData($step1[1], "CTRL+4 to stop...")
+	GUICtrlSetState($step1[4], $GUI_SHOW)
+	GUICtrlSetData($step1[4], 0)
 
-	Local $scan_result = _MemoryScan($hMemory,$itemScan1_Price,$scanStartAddress,$scanStopAddress,$scanCacheSize)
+	Local $scan_result = _MemoryScan($hMemory, $itemScan1_Price, $scanStartAddress, $scanStopAddress, $scanCacheSize)
 
-	GUICtrlSetState ( $step1[1], $GUI_ENABLE )
-	GUICtrlSetData( $step1[1], $step1_btnlabel )
+	GUICtrlSetState($step1[1], $GUI_ENABLE)
+	GUICtrlSetData($step1[1], $step1_btnlabel)
 
 
-	if $scan_result == -3 Then
+	If $scan_result == -3 Then
 
 		scanResToArray()
 
 		hideAllUpdateSteps()
 
-		For $i = 0 To UBound($step2)-1
-			GUICtrlSetState ( $step2[$i], $GUI_SHOW )
+		For $i = 0 To UBound($step2) - 1
+			GUICtrlSetState($step2[$i], $GUI_SHOW)
 		Next
-		GUICtrlSetState ( $step2[4], $GUI_HIDE )
+		GUICtrlSetState($step2[4], $GUI_HIDE)
 
 		stopAddressScanning()
 
 	Else
-		if $scan_result <> -4 Then
-			MsgBox(48,"Fail!","Error code " & $scan_result)
+		If $scan_result <> -4 Then
+			MsgBox(48, "Fail!", "Error code " & $scan_result)
 		EndIf
 		showStep0()
 	EndIf
 
 
-EndFunc
+EndFunc   ;==>doStep2
 
-func doStep3()
+Func doStep3()
 
-	GUICtrlSetState ( $step2[1], $GUI_DISABLE )
+	GUICtrlSetState($step2[1], $GUI_DISABLE)
 
-	if(MsgBox(BitXOR(1,64,262144),"Reminder","Please confirm that you are in '"&$itemScan2_Name&"' listing page and its current price is " & $itemScan2_Price & "z.")) Then
+	If (MsgBox(BitOR(1, 64, 262144), "Reminder", "Please confirm that you are in '" & $itemScan2_Name & "' listing page and its current price is " & $itemScan2_Price & "z.")) Then
 	Else
-		return
+		Return
 	EndIf
-	GUICtrlSetState ( $step2[1], $GUI_ENABLE )
+	GUICtrlSetState($step2[1], $GUI_ENABLE)
 
 	; Compare item price with previous value, if it changes to current price, that's the address that we are looking for!
 	comparePreviousValue($itemScan2_Price)
@@ -365,22 +383,22 @@ func doStep3()
 
 	hideAllUpdateSteps()
 
-	For $i = 0 To UBound($step3)-1
-		GUICtrlSetState ( $step3[$i], $GUI_SHOW )
+	For $i = 0 To UBound($step3) - 1
+		GUICtrlSetState($step3[$i], $GUI_SHOW)
 	Next
-	GUICtrlSetState ( $step3[4], $GUI_HIDE )
+	GUICtrlSetState($step3[4], $GUI_HIDE)
 
-EndFunc
+EndFunc   ;==>doStep3
 
-func doStepFinal()
+Func doStepFinal()
 
-	GUICtrlSetState ( $step3[1], $GUI_DISABLE )
+	GUICtrlSetState($step3[1], $GUI_DISABLE)
 
-	if(MsgBox(BitXOR(1,64,262144),"Reminder","Please confirm that you are in '"&$itemScan3_Name&"' listing page and its current price is " & $itemScan3_Price & "z.")) Then
+	If (MsgBox(BitOR(1, 64, 262144), "Reminder", "Please confirm that you are in '" & $itemScan3_Name & "' listing page and its current price is " & $itemScan3_Price & "z.")) Then
 	Else
-		return
+		Return
 	EndIf
-	GUICtrlSetState ( $step3[1], $GUI_ENABLE )
+	GUICtrlSetState($step3[1], $GUI_ENABLE)
 
 	; Check item price address once more, just to be sure...
 	comparePreviousValue($itemScan3_Price)
@@ -388,53 +406,53 @@ func doStepFinal()
 	; Filter itemid address list
 	filterPotentialItemID()
 
-	if (UBound($scanPriceAddressList) > 0) And UBound($scanIdAddressList) > 0 Then
-		MsgBox(BitXOR(64,262144),"Success!","Needed address has been saved.")
+	If (UBound($scanPriceAddressList) > 0) And UBound($scanIdAddressList) > 0 Then
+		MsgBox(BitOR(64, 262144), "Success!", "Needed address has been saved.")
 
-		$selectedItemID_address = "0x" & Hex($scanIdAddressList[0],8)
-		$selectedItemPrice_address = "0x" & Hex($scanPriceAddressList[0],8)
+		$selectedItemID_address = "0x" & Hex($scanIdAddressList[0], 8)
+		$selectedItemPrice_address = "0x" & Hex($scanPriceAddressList[0], 8)
 
-		setConf("itemIdAddress",$selectedItemID_address)
-		setConf("itemPriceAddress",$selectedItemPrice_address)
+		setConf("itemIdAddress", $selectedItemID_address)
+		setConf("itemPriceAddress", $selectedItemPrice_address)
 
 		;$selectedItemID_address = getConf("itemIdAddress")
 		;$selectedItemPrice_address = getConf("itemPriceAddress")
 	Else
-		MsgBox(BitXOR(48,262144),"Oops!","Address cannot be found. Did you follow the instruction carefully? Also, make sure your Root access for your emulator is enabled. Restart the game + this tool also helps.")
+		MsgBox(BitOR(48, 262144), "Oops!", "Address cannot be found. Did you follow the instruction carefully? Also, make sure your Root access for your emulator is enabled. Restart the game + this tool also helps.")
 	EndIf
 
 	showStep0()
 
-EndFunc
+EndFunc   ;==>doStepFinal
 
 
-func doCancelUpdate()
+Func doCancelUpdate()
 	print("> Memory Address Update Wizard Cancelled...")
 
 	stopAddressScanning()
 	showStep0()
-EndFunc
+EndFunc   ;==>doCancelUpdate
 
 
-func scanResToArray()
+Func scanResToArray()
 
-Local $addCount = 0
-	$scanResList = _FileListToArray ( $tmpdirPath , "*.scanres",1)
-	if UBound($scanResList) <> 0 Then
+	Local $addCount = 0
+	$scanResList = _FileListToArray($tmpdirPath, "*.scanres", 1)
+	If UBound($scanResList) <> 0 Then
 
 		For $i = 1 To $scanResList[0]
-			$fileName = $scanResList[$i];
-			$baseAddress = StringSplit($fileName,".")[1]
+			$fileName = $scanResList[$i] ;
+			$baseAddress = StringSplit($fileName, ".")[1]
 			$addList = FileReadToArray($tmpdirPath & "\" & $fileName)
-			For $line = 0 To UBound($addList)-1
-				$addOffset = StringSplit($addList[$line],",")[1]
+			For $line = 0 To UBound($addList) - 1
+				$addOffset = StringSplit($addList[$line], ",")[1]
 
-				$endAdd = Dec($baseAddress) + Int($addOffset);
+				$endAdd = Dec($baseAddress) + Int($addOffset) ;
 
 				; Clean non-divided by 4 aligned address
-				$endAddress = Hex($endAdd,8)
+				$endAddress = Hex($endAdd, 8)
 
-				if(alignedBy4($endAdd)) Then
+				If (alignedBy4($endAdd)) Then
 					addToPriceAddressList($endAdd)
 					print("+ " & $endAddress)
 				Else
@@ -446,34 +464,34 @@ Local $addCount = 0
 		Next
 
 	Else
-		MsgBox(BitXOR(16,262144),"Oops!","No address is found.")
+		MsgBox(BitOR(16, 262144), "Oops!", "No address is found.")
 		; Reset wizard
 	EndIf
 
-EndFunc
+EndFunc   ;==>scanResToArray
 
-func comparePreviousValue($itemPrice)
+Func comparePreviousValue($itemPrice)
 
 	$startingListCount = (UBound($scanPriceAddressList) - 1)
 
 
-	For $i = $startingListCount to 0 Step -1
+	For $i = $startingListCount To 0 Step -1
 		$address = $scanPriceAddressList[$i]
 		$addressValue = _MemoryRead($address, $hMemory, 'dword')
-		print("> No. " & $i & ": Current value for " & Hex($address,8) & " = " & $addressValue)
+		print("> No. " & $i & ": Current value for " & Hex($address, 8) & " = " & $addressValue)
 
-		if ($addressValue <> $itemPrice) Then
+		If ($addressValue <> $itemPrice) Then
 			;print("- Price is not equal to " & $itemScan2_Price & "z. Wrong address.")
-			_ArrayDelete($scanPriceAddressList,$i)
+			_ArrayDelete($scanPriceAddressList, $i)
 		Else
 			ConsoleWrite(" <<-- Gotcha!")
 		EndIf
 	Next
 
-EndFunc
+EndFunc   ;==>comparePreviousValue
 
 
-func findPotentialItemID()
+Func findPotentialItemID()
 
 	; Find potential item id address based on item price address.
 	; item id normally 0x40, 0x0A or 0x0C less or greater than item price address.
@@ -485,15 +503,15 @@ func findPotentialItemID()
 	$startingItemPriceListCount = (UBound($scanPriceAddressList) - 1)
 
 
-	For $i = $startingItemPriceListCount to 0 Step -1
-		print("> Checking potential for " & Hex($scanPriceAddressList[$i],8) )
-		For $i2 = 21 to -21 Step -1
+	For $i = $startingItemPriceListCount To 0 Step -1
+		print("> Checking potential for " & Hex($scanPriceAddressList[$i], 8))
+		For $i2 = 21 To -21 Step -1
 			$potentialAddress = ($scanPriceAddressList[$i] + (16 * $i2))
 			$potentialAddressValue = _MemoryRead($potentialAddress, $hMemory, 'dword')
 
-			if($potentialAddressValue == $itemScan2_Id) Then
-				print("+ Yes!! " & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
-				_ArrayAdd($scanIdAddressList,$potentialAddress)
+			If ($potentialAddressValue == $itemScan2_Id) Then
+				print("+ Yes!! " & Hex($potentialAddress, 8) & " = " & $potentialAddressValue)
+				_ArrayAdd($scanIdAddressList, $potentialAddress)
 			Else
 				;print("- Nope! " & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
 			EndIf
@@ -501,44 +519,44 @@ func findPotentialItemID()
 		Next
 	Next
 
-EndFunc
+EndFunc   ;==>findPotentialItemID
 
-func filterPotentialItemID()
+Func filterPotentialItemID()
 
 	$startingItemIdListCount = (UBound($scanIdAddressList) - 1)
 
-	For $i = $startingItemIdListCount to 0 Step -1
-		print("> Filtering potential for " & Hex($scanIdAddressList[$i],8) )
+	For $i = $startingItemIdListCount To 0 Step -1
+		print("> Filtering potential for " & Hex($scanIdAddressList[$i], 8))
 
-		$potentialAddress = $scanIdAddressList[$i];
+		$potentialAddress = $scanIdAddressList[$i] ;
 		$potentialAddressValue = _MemoryRead($potentialAddress, $hMemory, 'dword')
 
-		if($potentialAddressValue == $itemScan3_Id) Then
-			ConsoleWrite(" <<--  OK!" & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
+		If ($potentialAddressValue == $itemScan3_Id) Then
+			ConsoleWrite(" <<--  OK!" & Hex($potentialAddress, 8) & " = " & $potentialAddressValue)
 		Else
-			ConsoleWrite(" <<-- Nope! " & Hex($potentialAddress,8) & " = " & $potentialAddressValue )
-			_ArrayDelete($scanIdAddressList,$i)
+			ConsoleWrite(" <<-- Nope! " & Hex($potentialAddress, 8) & " = " & $potentialAddressValue)
+			_ArrayDelete($scanIdAddressList, $i)
 		EndIf
 
 	Next
 
-EndFunc
+EndFunc   ;==>filterPotentialItemID
 
-func updateGuiView()
+Func updateGuiView()
 
-	if ($updateInterval > 30) Then
+	If ($updateInterval > 30) Then
 		$updateInterval = 0
-		$itemPrice = _MemoryRead($selectedItemPrice_address,$hMemory,'dword')
-		GUICtrlSetData($itemPrice_txt,formatPrice($itemPrice) & "z")
+		$itemPrice = _MemoryRead($selectedItemPrice_address, $hMemory, 'dword')
+		GUICtrlSetData($itemPrice_txt, formatPrice($itemPrice) & "z")
 
-		$itemId = _MemoryRead($selectedItemID_address,$hMemory,'dword')
-		GUICtrlSetData($itemPrice_grp,"Selected Item Price ( ID: " & $itemId & " )" )
+		$itemID = _MemoryRead($selectedItemID_address, $hMemory, 'dword')
+		GUICtrlSetData($itemPrice_grp, "Selected Item Price ( ID: " & $itemID & " )")
 
 	EndIf
 
 	$updateInterval += 1
 
-EndFunc
+EndFunc   ;==>updateGuiView
 
 
 
@@ -551,125 +569,133 @@ Func startScan()
 	Sleep(100)
 	WinWait($hWnd)
 
-	MouseClick("left",$listDragPointCoor[0],$listDragPointCoor[1]) ; Init click to focus
+	MouseClick("left", $listDragPointCoor[0], $listDragPointCoor[1]) ; Init click to focus
 
 	; Show list area
-	if $debugMode Then
-		MouseMove($listAreaStartCoor[0],$listAreaStartCoor[1])
+	If $debugMode Then
+		MouseMove($listAreaStartCoor[0], $listAreaStartCoor[1])
 		Sleep(500)
-		MouseMove($listAreaStartCoor[0]+($itemListWidth*2),$listAreaStartCoor[1]+($itemListHeight*4+40))
+		MouseMove($listAreaStartCoor[0] + ($itemListWidth * 2), $listAreaStartCoor[1] + ($itemListHeight * 4 + 40))
 	EndIf
 
 
 	$scanning = True
+
+	$scanTimeStart = TimerInit()
+	print("> Scanning Start at " & _NowTime() & @CRLF)
 
 	While $scanning
 		WinActivate($hWnd)
 		scanCurrentList()
 		scrollItemList()
 	WEnd
-EndFunc
+
+	$scanTimeDiff = TimerDiff($scanTimeStart)
+	print("> Scanning Ended at " & _NowTime())
+	print("> Scanning took " & Floor($scanTimeDiff / 1000) & "s.")
+
+
+EndFunc   ;==>startScan
 
 
 Func pauseScan()
 
-	$pause = Not($pause)
-	if $pause Then
+	$pause = Not ($pause)
+	If $pause Then
 		print("Pause Scanning...")
 	Else
 		print("Resume Scanning...")
 	EndIf
 
-EndFunc
+EndFunc   ;==>pauseScan
 
-func scrollItemList()
+Func scrollItemList()
 	WinActivate($hWnd)
 
-	MouseClick("left",$listDragPointCoor[0],$listDragPointCoor[1]-50)
+	MouseClick("left", $listDragPointCoor[0], $listDragPointCoor[1] - 50)
 	Sleep(150)
-	MouseWheel("down",1)
+	MouseWheel("down", 1)
 	Sleep(150)
-	MouseWheel("down",1)
-	;Sleep(150)
-	;MouseWheel("down",1)
+	MouseWheel("down", 1)
+	Sleep(150)
+	MouseWheel("down", 1)
 	Sleep(1500)
 
-	if checkEndList() Then
-
-		printPricelist()
+	If checkEndList() Then
+		;printPricelist()
 		print("> scrollItemList Ended!")
-
+		savePricelist()
 		$scanning = False
 	EndIf
 
 	;MouseClickDrag("left",$listDragPointCoor[0],$listDragPointCoor[1],$listDragPointCoor[0],$listDragPointCoor[1]-$listDragDistance,$scrollDragSpeed)
-EndFunc
+EndFunc   ;==>scrollItemList
 
 Func scanCurrentList()
 	Local $x = 0
 
 	While $x < 8
-		if Not($pause) Then
+		If Not ($pause) Then
 			scanEachListItem($x)
-			$x += 1;
+			$x += 1 ;
 			Sleep(50)
 
-			if Not($scanning) Then
+			If Not ($scanning) Then
 				ExitLoop
 			EndIf
 		EndIf
 	WEnd
-EndFunc
+EndFunc   ;==>scanCurrentList
 
-func scanEachListItem($index)
+Func scanEachListItem($index)
 	Dim $area[4]
 
-	$column = Mod($index,2);
+	$column = Mod($index, 2) ;
 	$row = Floor($index / 2)
 
-	$offset_x = $column * $itemListWidth;370
-	$offset_y = $row * $itemListHeight;96
+	$offset_x = $column * $itemListWidth ;370
+	$offset_y = $row * $itemListHeight ;96
 
-	$list_point_x = $listAreaStartCoor[0]+$offset_x
-	$list_point_y = $listAreaStartCoor[1]+$offset_y
+	$list_point_x = $listAreaStartCoor[0] + $offset_x
+	$list_point_y = $listAreaStartCoor[1] + $offset_y
 
 	$area[0] = $list_point_x
-	$area[1] = $list_point_y-24
+	$area[1] = $list_point_y - 24
 
-	$area[2] = $list_point_x+30;+($itemListWidth+10)
-	$area[3] = $list_point_y+($itemListHeight+40)
+	$area[2] = $list_point_x + 30 ;+($itemListWidth+10)
+	$area[3] = $list_point_y + ($itemListHeight + 40)
 
-	if $debugMode Then
-		MouseMove($area[0],$area[1])
+	If $debugMode Then
+		MouseMove($area[0], $area[1])
 		Sleep(500)
-		MouseMove($area[2],$area[3])
+		MouseMove($area[2], $area[3])
 	EndIf
 
 	scanClickPoint($area)
 
-EndFunc
+EndFunc   ;==>scanEachListItem
 
 
-func scanClickPoint($rect)
-	dim $result[2]
+Func scanClickPoint($rect)
+	Dim $result[2]
 
-	$borderFound = _ImageSearchArea("res/border_tl.bmp",0 , $rect[0],$rect[1],$rect[2],$rect[3], $result[0], $result[1],$itemListImageTolerence)
+	$borderFound = _ImageSearchArea("res/border_tl.bmp", 0, $rect[0], $rect[1], $rect[2], $rect[3], $result[0], $result[1], $itemListImageTolerence)
 
-	if($borderFound) Then
-		Dim $pos[2] =  [$result[0]+100,$result[1]+5]
+	If ($borderFound) Then
+		Dim $pos[2] = [$result[0] + 100, $result[1] + 5]
 
-		Local $dupeCount = checkDuplicateClick($pos[0],$pos[1])
+		Local $dupeCount = checkDuplicateClick($pos[0], $pos[1])
 
-		if $debugMode Then
-			if $dupeCount == 0 Then
-				MouseMove($pos[0],$pos[1],20)
+		If $debugMode Then
+			If $dupeCount == 0 Then
+				MouseMove($pos[0], $pos[1], 20)
 			EndIf
 		Else
 			; Scan before click
-			if $dupeCount == 0 Then
+			If $dupeCount == 0 Then
 				; No dupe
 				;print("> Check dupe: " & $dupeCount)
-				MouseClick("left",$pos[0],$pos[1],1,$mouseMoveDelay)
+				MouseClick("left", $pos[0], $pos[1], 1, $mouseMoveDelay)
 				getItemInfo()
 			EndIf
 
@@ -677,15 +703,15 @@ func scanClickPoint($rect)
 
 	EndIf
 
-EndFunc
+EndFunc   ;==>scanClickPoint
 
-func checkDuplicateClick($posX,$posY)
+Func checkDuplicateClick($posX, $posY)
 	$storeSampleCount = 6
 
 	$tmpBmpPath = $tmpdirPath & "\" & $clickSpotCount & ".bmp"
 
-	Local $dupeSampleRect[4] = [$posX,$posY+5,$posX+245,$posY+50]
-	Local $dupeCheckArea[4] = [$dupeSampleRect[0]-3,$dupeSampleRect[1]-5,$dupeSampleRect[2]+3,$dupeSampleRect[3]+5]
+	Local $dupeSampleRect[4] = [$posX, $posY + 5, $posX + 245, $posY + 50]
+	Local $dupeCheckArea[4] = [$dupeSampleRect[0] - 3, $dupeSampleRect[1] - 5, $dupeSampleRect[2] + 3, $dupeSampleRect[3] + 5]
 
 	_ScreenCapture_Capture($tmpBmpPath, $dupeSampleRect[0], $dupeSampleRect[1], $dupeSampleRect[2], $dupeSampleRect[3])
 
@@ -695,18 +721,18 @@ func checkDuplicateClick($posX,$posY)
 
 	;print("> create sample: "&$tmpBmpPath)
 
-	For $i = ($clickSpotCount-$storeSampleCount) to ($clickSpotCount-1)
+	For $i = ($clickSpotCount - $storeSampleCount) To ($clickSpotCount - 1)
 		$_eachBmp = $tmpdirPath & "\" & ($i) & ".bmp"
 
-		if $i > -1 Then
+		If $i > -1 Then
 
-			Local $foundDuplicate = _ImageSearchArea($_eachBmp,1 , $dupeCheckArea[0], $dupeCheckArea[1], $dupeCheckArea[2], $dupeCheckArea[3], $result[0], $result[1],120)
+			Local $foundDuplicate = _ImageSearchArea($_eachBmp, 1, $dupeCheckArea[0], $dupeCheckArea[1], $dupeCheckArea[2], $dupeCheckArea[3], $result[0], $result[1], 120)
 
 			If $foundDuplicate == True Then
 				;print("- FOUND DUPE > " & $_eachBmp & " - " & $foundDuplicate & " = " & $result[0] & " - " & $result[1] & " - " & $_eachBmp)
 				$dupeCount += 1
 				ExitLoop
-			ElseIf $foundDuplicate == False then
+			ElseIf $foundDuplicate == False Then
 				; keep file if there is no file or no dupe match.
 				$dupeCount += 0
 			Else
@@ -720,8 +746,8 @@ func checkDuplicateClick($posX,$posY)
 		; Delete last 15 bitmap
 	Next
 
-	if  $dupeCount == 0 Then
-		$deleteOldBmp = $tmpdirPath & "\" & ($clickSpotCount-($storeSampleCount+1)) & ".bmp"
+	If $dupeCount == 0 Then
+		$deleteOldBmp = $tmpdirPath & "\" & ($clickSpotCount - ($storeSampleCount + 1)) & ".bmp"
 		FileDelete($deleteOldBmp)
 		$clickSpotCount += 1
 	EndIf
@@ -729,86 +755,84 @@ func checkDuplicateClick($posX,$posY)
 	Return $dupeCount
 
 
-EndFunc
+EndFunc   ;==>checkDuplicateClick
 
 
-func print($string)
+Func print($string)
 	ConsoleWrite(@CRLF & $string)
-EndFunc
+	FileWriteLine("rom-scrapper.log", $string)
+EndFunc   ;==>print
 
 
-func getItemInfo()
+Func getItemInfo()
 	Local $itemID = 0
 
 	;print("> getItemInfo called")
 
 	$retryCount = 0
 
-	While $scanning
-		$itemID = _MemoryRead($selectedItemID_address,$hMemory,'dword')
-		$itemPrice = _MemoryRead($selectedItemPrice_address,$hMemory,'dword')
 
-		;print("~ "  & $itemID & " : " & $itemPrice &  " - $lastItemID: " & $lastItemID);
+	$itemID = _MemoryRead($selectedItemID_address, $hMemory, 'dword')
+	$itemPrice = _MemoryRead($selectedItemPrice_address, $hMemory, 'dword')
+
+	;print("~ "  & $itemID & " : " & $itemPrice &  " - $lastItemID: " & $lastItemID);
 
 
-		if $itemID <> $lastItemID Then
-			;print("+ ID: " & $itemID & ", Price: " & $itemPrice &  ", $lastItemID: " & $lastItemID);
-			addToPricelist($itemID,$itemPrice)
-			$lastItemID = $itemID
-			ExitLoop
-		EndIf
+	If $itemID <> $lastItemID Then
+		print("+ ID: " & $itemID & ", Price: " & $itemPrice & ", $lastItemID: " & $lastItemID) ;
+		addToPricelist($itemID, $itemPrice)
+		$lastItemID = $itemID
 
-		if($retryCount > 20) Then
-			print("! Price retrieve time-out");
-			ExitLoop
-		EndIf
-		$retryCount += 1
+	EndIf
 
-		sleep(50)
-	WEnd
+	If ($retryCount > 20) Then
+		print("! Price retrieve time-out") ;
+
+	EndIf
+	$retryCount += 1
 
 	backToList()
 
 	;print("> getItemInfo end")
-EndFunc
+EndFunc   ;==>getItemInfo
 
-func checkEndList()
-	Dim $area[4] = [$listAreaStartCoor[0]+40,$listAreaStartCoor[1]+20,$listAreaStartCoor[0]+70,$listAreaStartCoor[1]+300]
+Func checkEndList()
+	Dim $area[4] = [$listAreaStartCoor[0] + 40, $listAreaStartCoor[1] + 20, $listAreaStartCoor[0] + 70, $listAreaStartCoor[1] + 300]
 
-	Local $pixel_checksum = PixelChecksum($area[0],$area[1],$area[2],$area[3])
+	Local $pixel_checksum = PixelChecksum($area[0], $area[1], $area[2], $area[3])
 
 
-	if $lastListEndChecksum == $pixel_checksum Then
+	If $lastListEndChecksum == $pixel_checksum Then
 		;print("> List End")
-		return True
+		Return True
 	Else
 		;print("# "&$pixel_checksum)
 		$lastListEndChecksum = $pixel_checksum
-		return False
+		Return False
 	EndIf
 
-EndFunc
+EndFunc   ;==>checkEndList
 
-func findCategory()
+Func findCategory()
 	print($categoryList[$categoryIndex])
 	Dim $result[2]
-	Dim $rect[4] = [$categorylistAreaStartCoor[0],$categorylistAreaStartCoor[1],$categorylistAreaStartCoor[0] + $categoryListWidth,$categorylistAreaStartCoor[1] + $categoryListHeight]
+	Dim $rect[4] = [$categorylistAreaStartCoor[0], $categorylistAreaStartCoor[1], $categorylistAreaStartCoor[0] + $categoryListWidth, $categorylistAreaStartCoor[1] + $categoryListHeight]
 	Local $imageFile = "res/" & $categoryList[$categoryIndex] & ".bmp"
-	Local $found = _ImageSearchArea($imageFile,1 , $rect[0],$rect[1],$rect[2],$rect[3], $result[0], $result[1],$categoryImageTolerence)
+	Local $found = _ImageSearchArea($imageFile, 1, $rect[0], $rect[1], $rect[2], $rect[3], $result[0], $result[1], $categoryImageTolerence)
 
-	if $debugMode Then
-		MouseMove($rect[0],$rect[1])
+	If $debugMode Then
+		MouseMove($rect[0], $rect[1])
 		Sleep(500)
-		MouseMove($rect[2],$rect[3],0)
+		MouseMove($rect[2], $rect[3], 0)
 	EndIf
 
-	if($found) Then
-		Dim $pos[2] =  [$result[0],$result[1]]
+	If ($found) Then
+		Dim $pos[2] = [$result[0], $result[1]]
 		print($result[0] & "/" & $result[1])
-		if $debugMode Then
-			MouseMove($pos[0],$pos[1])
+		If $debugMode Then
+			MouseMove($pos[0], $pos[1])
 		Else
-			MouseMove($pos[0],$pos[1])
+			MouseMove($pos[0], $pos[1])
 			;MouseClick("left",$pos[0],$pos[1])
 		EndIf
 	Else
@@ -816,59 +840,67 @@ func findCategory()
 	EndIf
 
 
-EndFunc
+EndFunc   ;==>findCategory
 
-func changeCategory()
-	$categoryIndex+=1
-	if $categoryIndex >= UBound($categoryList) Then
+Func changeCategory()
+	$categoryIndex += 1
+	If $categoryIndex >= UBound($categoryList) Then
 		$categoryIndex = 0
 	EndIf
-EndFunc
+EndFunc   ;==>changeCategory
 
-func backToList()
-	MouseClick("left",$backButtonCoor[0],$backButtonCoor[1],1,$mouseMoveDelay)
-EndFunc
+Func backToList()
+	MouseClick("left", $backButtonCoor[0], $backButtonCoor[1], 1, $mouseMoveDelay)
+EndFunc   ;==>backToList
 
 Func exitApp()
 	$scanning = False
 	Exit
-EndFunc
+EndFunc   ;==>exitApp
 
-func getConf($key)
-	return IniRead("config.ini","config",$key,"Error")
-EndFunc
+Func getConf($key)
+	Return IniRead("config.ini", "config", $key, "Error")
+EndFunc   ;==>getConf
 
-func setConf($key,$value)
-	IniWrite("config.ini","config",$key,$value)
-EndFunc
+Func setConf($key, $value)
+	IniWrite("config.ini", "config", $key, $value)
+EndFunc   ;==>setConf
 
 
-func addToPricelist($itemID,$itemPrice)
-	dim $valueArr[2] = [$itemPrice,getTimestamp()]
+Func addToPricelist($itemID, $itemPrice)
+	Dim $valueArr[2] = [$itemPrice, getTimestamp()]
 	$value = ($valueArr)
-	Json_ObjPut($jsonObj,$itemID,$value)
-	$priceCount = Json_ObjGetCount($jsonObj)
+	Json_ObjPut($pricelistJsonObj, $itemID, $value)
+	$priceCount = Json_ObjGetCount($pricelistJsonObj)
 
 	$updateInterval = 31
 	updateGuiView()
-	GUICtrlSetData($pricecount_txt,"Price Recorded: " & $priceCount)
-EndFunc
+	GUICtrlSetData($pricecount_txt, "Price Recorded: " & $priceCount)
+EndFunc   ;==>addToPricelist
 
-func getPricelist()
-	return (json_encode($jsonObj))
-EndFunc
+Func getPricelist()
+	Return (json_encode($pricelistJsonObj))
+EndFunc   ;==>getPricelist
 
-func printPricelist()
-	print(getPricelist())
-EndFunc
+Func printPricelist()
+	Local $pricelist = getPricelist()
+	print($pricelist)
+EndFunc   ;==>printPricelist
 
-func getTimestamp()
-	return _DateDiff( 's',"1970/01/01 00:00:00",_NowCalc())
-EndFunc
+Func savePricelist()
+	Local $pricelist = getPricelist()
+	print("> Saving pricelist > '" & $outputPricelistJson & "'...")
+
+	saveToFilePath($outputPricelistJson, $pricelist)
+EndFunc   ;==>savePricelist
+
+Func getTimestamp()
+	Return _DateDiff('s', "1970/01/01 00:00:00", _NowCalc())
+EndFunc   ;==>getTimestamp
 
 Func formatPrice($number)
-	return StringRegExpReplace($number, "(?!\.)(\d)(?=(?:\d{3})+(?!\d))(?<!\.\d{1}|\.\d{2}|\.\d{3}|\.\d{4}|\.\d{5}|\.\d{6}|\.\d{7}|\.\d{8}|\.\d{9})", "\1,")
-EndFunc
+	Return StringRegExpReplace($number, "(?!\.)(\d)(?=(?:\d{3})+(?!\d))(?<!\.\d{1}|\.\d{2}|\.\d{3}|\.\d{4}|\.\d{5}|\.\d{6}|\.\d{7}|\.\d{8}|\.\d{9})", "\1,")
+EndFunc   ;==>formatPrice
 
 Func _GetHwndFromPID($PID)
 	$hWnd = 0
@@ -885,38 +917,27 @@ Func _GetHwndFromPID($PID)
 		Next
 	Until $hWnd <> 0
 	Return $hWnd
-EndFunc
+EndFunc   ;==>_GetHwndFromPID
 
-func formatPattern($pattern)
-	$pArray = StringRegExp($pattern, ".{2}", 3)
-
-	if UBound($pArray) > 0 Then
-	_ArrayReverse($pArray)
-	$xx = '\x' & _ArrayToString($pArray,'\x')
-	EndIf
-
-EndFunc
-
-
-func alignedBy4($val)
-	if (Floor(($val/4))*4) == $val Then
-		return True
+Func alignedBy4($val)
+	If (Floor(($val / 4)) * 4) == $val Then
+		Return True
 	Else
-		return False
+		Return False
 	EndIf
-EndFunc
+EndFunc   ;==>alignedBy4
 
-Func roundBytes($address,$bytesLen)
-	return (Floor($address/$bytesLen))*$bytesLen
-EndFunc
+Func roundBytes($address, $bytesLen)
+	Return (Floor($address / $bytesLen)) * $bytesLen
+EndFunc   ;==>roundBytes
 
 Func roundDword($address)
-	return roundBytes($address,4)
-EndFunc
+	Return roundBytes($address, 4)
+EndFunc   ;==>roundDword
 
 Func roundWord($address)
-	return roundBytes($address,2)
-EndFunc
+	Return roundBytes($address, 2)
+EndFunc   ;==>roundWord
 
 Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddress = 0xEFFFFFFF, $Step = 2560000)
 
@@ -926,41 +947,41 @@ Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddr
 	$StopAddress = roundDword(Int(StringFormat("%u", $StopAddress)))
 	$Step = roundDword($Step)
 
-	Local $maxStep = Floor(($StopAddress-$StartAddress)/$Step)
+	Local $maxStep = Floor(($StopAddress - $StartAddress) / $Step)
 	print("$maxStep: " & $maxStep)
 
 	If Not IsArray($ProcessHandle) Then
-	  SetError(1)
-	  Return -1
+		SetError(1)
+		Return -1
 	EndIf
 
 
 
 	; Convert int to little endian hex
-	if IsInt($pattern) then
-		$pattern = Hex($pattern,8)
+	If IsInt($pattern) Then
+		$pattern = Hex($pattern, 8)
 		$pArray = StringRegExp($pattern, ".{2}", 3)
 		_ArrayReverse($pArray)
-		$pattern = _ArrayToString($pArray," ")
+		$pattern = _ArrayToString($pArray, " ")
 	EndIf
 
 	$pattern = StringRegExpReplace($pattern, '[^?0123456789ABCDEFabcdef.]', '')
 
 	If StringLen($pattern) = 0 Then
-	  SetError(2)
-	  Return -2
+		SetError(2)
+		Return -2
 	EndIf
 
 	Local $BufferPattern, $FormatedPattern
 	For $i = 0 To ((StringLen($pattern) / 2) - 1)
-	  $BufferPattern = StringLeft($pattern, 2)
-	  $pattern = StringRight($pattern, StringLen($pattern) - 2)
-	  $FormatedPattern = $FormatedPattern & $BufferPattern
+		$BufferPattern = StringLeft($pattern, 2)
+		$pattern = StringRight($pattern, StringLen($pattern) - 2)
+		$FormatedPattern = $FormatedPattern & $BufferPattern
 	Next
 
 	; Split binary
 	$pArray = StringRegExp($FormatedPattern, ".{2}", 3)
-	$pattern = '\x' & _ArrayToString($pArray,'\x')
+	$pattern = '\x' & _ArrayToString($pArray, '\x')
 
 	Local $countScan = 0
 	Local $ScanStep = $Step - (StringLen($pattern) / 2)
@@ -971,11 +992,11 @@ Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddr
 	For $address = $StartAddress To $StopAddress Step $ScanStep
 
 
-		$memory = _MemoryRead($address, $ProcessHandle, 'byte['&$Step&']')
+		$memory = _MemoryRead($address, $ProcessHandle, 'byte[' & $Step & ']')
 
 
 		$Previous_Time = TimerInit()
-		scanMemSection($memory,$pattern,$address)
+		scanMemSection($memory, $pattern, $address)
 		;scanMemSection2($memory,$pattern,$address)
 		;scanMemSection3($memory,$pattern,$address)
 		$Time_Difference = TimerDiff($Previous_Time)
@@ -984,44 +1005,44 @@ Func _MemoryScan($ProcessHandle, $pattern, $StartAddress = 0x6FFFFFFF, $StopAddr
 		;print($countScan)
 		$countScan += 1
 
-		$waitingTime =  Ceiling(TimerDiff($Start_Time)/1000)
+		$waitingTime = Ceiling(TimerDiff($Start_Time) / 1000)
 
-		if $waitingTime <> $lastWaitingTime Then
+		If $waitingTime <> $lastWaitingTime Then
 			$lastWaitingTime = $waitingTime
 			print("> Waiting Time: " & $waitingTime & "s")
 		EndIf
 
-		if Not($addressScanning) Then
+		If Not ($addressScanning) Then
 			Return -4
 			ExitLoop
 		EndIf
 
 		getGuiMsg()
-		GUICtrlSetData($step1[4], (($countScan/$maxStep)*100))
+		GUICtrlSetData($step1[4], (($countScan / $maxStep) * 100))
 	Next
 
 
 	Return -3
-EndFunc
+EndFunc   ;==>_MemoryScan
 
 Func stopAddressScanning()
 	clearScanCache()
 	$addressScanning = False
-EndFunc
+EndFunc   ;==>stopAddressScanning
 
-func clearScanCache()
+Func clearScanCache()
 	$deleteCmd = @ComSpec & " /c del /Q " & $tmpdirPath
-	RunWait($deleteCmd,@WorkingDir,@SW_HIDE)
-EndFunc
+	RunWait($deleteCmd, @WorkingDir, @SW_HIDE)
+EndFunc   ;==>clearScanCache
 
-Func scanMemSection($memory,$pattern,$address)
+Func scanMemSection($memory, $pattern, $address)
 
-	$tmpFile = $tmpdirPath&"\"& hex($address,8)
-	$tmpFileRes = $tmpdirPath&"\"& hex($address,8)&".scanres"
+	$tmpFile = $tmpdirPath & "\" & Hex($address, 8)
+	$tmpFileRes = $tmpdirPath & "\" & Hex($address, 8) & ".scanres"
 
-	$payload = $memory; StringTrimLeft(($memory),2);
+	$payload = $memory ; StringTrimLeft(($memory),2);
 
-	FileWrite($tmpFile,$payload)
+	FileWrite($tmpFile, $payload)
 
 	; using grep is faster than autoit substring......  TODO: find faster way to scan
 	; Sqlite is faster than grep..
@@ -1029,31 +1050,80 @@ Func scanMemSection($memory,$pattern,$address)
 	;$Previous_Time = TimerInit()
 	;RunWait(@ComSpec & " /c grep -ob '" & $Pattern & "' " & $tmpFile & " >> " & $tmpFileRes,@WorkingDir,@SW_HIDE)
 
-	$run_cmd = @ComSpec & ' /c "'&@WorkingDir&'\library\pcre2grep.exe" -a --file-offsets --buffer-size=3M  ' & $Pattern & " " & $tmpFile & " > " & $tmpFileRes
-	RunWait($run_cmd,@WorkingDir,@SW_HIDE)
+	$run_cmd = @ComSpec & ' /c "' & @WorkingDir & '\library\pcre2grep.exe" -a --file-offsets --buffer-size=3M  ' & $pattern & " " & $tmpFile & " > " & $tmpFileRes
+	RunWait($run_cmd, @WorkingDir, @SW_HIDE)
 
 	FileDelete($tmpFile)
 
-	if FileGetSize($tmpFileRes) == 0 Then
+	If FileGetSize($tmpFileRes) == 0 Then
 		FileDelete($tmpFileRes)
 	EndIf
 
-EndFunc
+EndFunc   ;==>scanMemSection
 
-Func scanMemSection2($memory,$pattern,$address)
+Func scanMemSection2($memory, $pattern, $address)
 	; Very slow
-	$payload = StringTrimLeft(String($memory),2);
-	$result = StringInStr($payload,$pattern)
-	if $result <> 0 Then
+	$payload = StringTrimLeft(String($memory), 2) ;
+	$result = StringInStr($payload, $pattern)
+	If $result <> 0 Then
 		print($result)
 	EndIf
-EndFunc
+EndFunc   ;==>scanMemSection2
 
-Func scanMemSection3($memory,$pattern,$address)
+Func scanMemSection3($memory, $pattern, $address)
 	; No longer needed
 	;_SQLite_Exec(-1, "INSERT INTO scan_db(memory,base_address) VALUES (x'"&StringTrimLeft($memory,2)&"','"&hex($address,8)&"');")
-EndFunc
+EndFunc   ;==>scanMemSection3
 
 Func addToPriceAddressList($address)
-	_ArrayAdd($scanPriceAddressList,$address)
-EndFunc
+	_ArrayAdd($scanPriceAddressList, $address)
+EndFunc   ;==>addToPriceAddressList
+
+
+Func createFilePath($filePath)
+	$filePath = StringReplace($filePath, "/", "\")
+	$filePathArr = StringSplit($filePath, "\")
+
+	$fileDir = _ArrayToString($filePathArr, "\", 1, UBound($filePathArr) - 2)
+
+	If FileExists($fileDir) Then
+		;Return False
+		Return $fileDir
+	EndIf
+
+	If DirCreate($fileDir) == 1 Then
+		print('> ' & $fileDir & " dir created.")
+		;return True
+	EndIf
+
+	Return $fileDir
+EndFunc   ;==>createFilePath
+
+Func saveToFilePath($filePath, $data)
+	Local $fHandle, $baseJsonStr, $baseJsonObj
+
+	; Create file dir if it's not exist.
+	$dirPath = createFilePath($filePath)
+
+	$baseJsonStr = FileRead($filePath)
+
+	If StringLen($baseJsonStr) < 1 Then
+		$baseJsonStr = "{}"
+	EndIf
+
+	$baseJsonObj = Json_Decode($baseJsonStr)
+
+	Json_ObjMerge($baseJsonObj, $pricelistJsonObj)
+
+
+	$currentPricelistJsonStr = json_encode($pricelistJsonObj)
+	$baseJsonStr = json_encode($baseJsonObj)
+
+	$fHandle = FileOpen($filePath, 2)
+	FileWrite($fHandle, $baseJsonStr)
+	FileClose($fHandle)
+
+	$dirPathChunk = createFilePath($dirPath & "\_update_segment\")
+	FileWrite($dirPathChunk & "\price_update_" & getTimestamp() & ".json", $currentPricelistJsonStr)
+
+EndFunc   ;==>saveToFilePath

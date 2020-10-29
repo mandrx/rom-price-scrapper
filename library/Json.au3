@@ -36,6 +36,7 @@
 ;   Json_Put(ByRef $Var, $Notation, $Data, $CheckExists = False)
 ;   Json_Get(ByRef $Var, $Notation)
 ;   Json_Dump($String)
+;	Json_ObjMerge(ByRef $Object, $Object2) ; mandrx
 ; ============================================================================================================================
 
 #include-once
@@ -554,3 +555,19 @@ Func _Json_TokenDump(ByRef $Json, $Ptr, ByRef $Next, $ObjPath = "")
 			Return $LastKey
 	EndSwitch
 EndFunc   ;==>_Json_TokenDump
+
+
+
+Func Json_ObjMerge(ByRef $Object, $Object2)
+	$Object2Keys = $Object2.Keys()
+
+	For $i = 0 To UBound($Object2Keys) - 1
+		$Key = $Object2Keys[$i]
+		$Value = $Object2.Item($Key)
+
+		If $Object.Exists($Key) Then $Object.Remove($Key)
+		$Object.Add($Key, $Value)
+	Next
+
+	Return $Object.Items()
+EndFunc   ;==>Json_ObjMerge
